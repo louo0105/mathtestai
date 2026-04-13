@@ -20,7 +20,8 @@ const loginError = document.getElementById('login-error');
 // 新增追蹤變數
 let practiceStartTime = null;
 let customMapping = JSON.parse(localStorage.getItem('custom_student_mapping'));
-let isAiMode = false; // 全域 AI 模式狀態
+let currentTeacherId = 'admin'; // 當前登入學生的指導老師或系統管理員 ID
+let isAiMode = false; // 目前所在環境的 AI 模式狀態
 
 // 獲取目前的學生清單（優先使用自定義）
 function getMapping() {
@@ -42,38 +43,41 @@ function mergeExtraQuestions() {
 
     // 2. 將新的題庫合併進來
     if (typeof EXTRA_QUESTION_BANK !== 'undefined') {
-        Object.keys(EXTRA_QUESTION_BANK).forEach(node => {
-            if (!QUESTION_BANK[node]) QUESTION_BANK[node] = {};
-            Object.keys(EXTRA_QUESTION_BANK[node]).forEach(level => {
+        for (const node in EXTRA_QUESTION_BANK) {
+            if (!QUESTION_BANK[node]) QUESTION_BANK[node] = { beginner: [], intermediate: [], advanced: [] };
+            for (const level in EXTRA_QUESTION_BANK[node]) {
                 if (!QUESTION_BANK[node][level]) QUESTION_BANK[node][level] = [];
-                QUESTION_BANK[node][level].push(...EXTRA_QUESTION_BANK[node][level]);
-            });
-        });
+                // 使用 concat 避免 spread operator (...) 在大數據量下發生堆疊溢位 (Stack Overflow)
+                QUESTION_BANK[node][level] = QUESTION_BANK[node][level].concat(EXTRA_QUESTION_BANK[node][level]);
+            }
+        }
     }
 }
 
 // 初始化
 async function init() {
     try {
-        console.log("🚀 系統初始化中...");
-        mergeExtraQuestions();
-        setupEventListeners();
+        console.log("🚀 系統啟動中...");
         
-        // 優先顯示登入畫面，避免被後續非同步請求擋住
+        // Step 1: 立即確保登入畫面顯示
         loginPage.classList.add('active');
-
-        // 嘗試獲取雲端設定 (若失敗會被 db.js 的超時保護攔截)
-        if (typeof DatabaseService !== 'undefined') {
-            const settings = await DatabaseService.getSystemSettings();
-            isAiMode = (settings && settings.ai_mode) || false;
-            updateAIStatusUI();
-        }
         
-        checkAutoLogin();
-        console.log("✅ 初始化完成");
+        setupEventListeners();
+        mergeExtraQuestions();
+        
+        console.log("👤 檢查自動登入...");
+        await checkAutoLogin();
+        
+        console.log("✨ 系統初始化成功！");
+        // 顯示一個小小的 Toast 提示初始化成功
+        const toast = document.createElement('div');
+        toast.style = "position:fixed; bottom:20px; right:20px; background:rgba(0,122,255,0.8); color:white; padding:10px 20px; border-radius:30px; z-index:9999; font-size:12px;";
+        toast.textContent = "✅ 系統已就緒";
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+
     } catch (err) {
-        console.error("❌ 初始化發生錯誤:", err);
-        // 即便報錯，也設法讓登入畫面出來
+        console.error("❌ 系統啟動失敗:", err);
         loginPage.classList.add('active');
     }
 }
@@ -123,7 +127,7 @@ function setupEventListeners() {
     const aiToggle = document.getElementById('ai-mode-toggle');
     if (aiToggle) {
         aiToggle.addEventListener('change', async (e) => {
-            const success = await DatabaseService.updateSystemSettings(e.target.checked);
+            const success = await DatabaseService.updateSystemSettings(e.target.checked, currentTeacherId);
             if (success) {
                 isAiMode = e.target.checked;
                 updateAIStatusUI();
@@ -137,14 +141,23 @@ function setupEventListeners() {
 
 // 登入處理
 async function handleLogin() {
-    const num = studentInput.value.trim();
+    const num = studentInput.value.trim().toLowerCase();
     if (!num) {
         showError('請輸入號碼');
         return;
     }
 
     // 教師登入判斷
-    if (num.toLowerCase() === 'admin' || num === 'teacher') {
+    if (['admin', 'teacher', 'admin3', 'admin4', 'admin6'].includes(num)) {
+        currentTeacherId = num === 'teacher' ? 'admin' : num;
+        localStorage.setItem('quiz_teacher_id', currentTeacherId);
+        
+        // 抓取該老師目前的 AI 設定
+        if (typeof DatabaseService !== 'undefined') {
+            const settings = await DatabaseService.getSystemSettings(currentTeacherId);
+            isAiMode = (settings && settings.ai_mode) || false;
+        }
+
         showTeacherPage();
         return;
     }
@@ -155,12 +168,23 @@ async function handleLogin() {
 
     if (studentData) {
         currentUser = { ...studentData, weakNodes: studentData.weak_nodes };
+        currentTeacherId = studentData.teacher_id || 'admin';
     } else if (mapping[num]) {
         currentUser = { ...mapping[num], id: num };
+        currentTeacherId = mapping[num].teacher_id || 'admin';
     }
 
     if (currentUser) {
         localStorage.setItem('quiz_user_id', num);
+        localStorage.setItem('quiz_teacher_id', currentTeacherId);
+        
+        // 依照該學生的老師載入相對應的 AI 設定
+        if (typeof DatabaseService !== 'undefined') {
+            const settings = await DatabaseService.getSystemSettings(currentTeacherId);
+            isAiMode = (settings && settings.ai_mode) || false;
+            updateAIStatusUI();
+        }
+        
         await loadUserProgress(num);
         showDashboard();
     } else {
@@ -170,6 +194,10 @@ async function handleLogin() {
 
 async function checkAutoLogin() {
     const savedId = localStorage.getItem('quiz_user_id');
+    const savedTeacherId = localStorage.getItem('quiz_teacher_id');
+    
+    if (savedTeacherId) currentTeacherId = savedTeacherId;
+    
     if (!savedId) return;
 
     let studentData = await DatabaseService.getStudent(savedId);
@@ -177,11 +205,20 @@ async function checkAutoLogin() {
 
     if (studentData) {
         currentUser = { ...studentData, weakNodes: studentData.weak_nodes };
+        currentTeacherId = studentData.teacher_id || 'admin';
     } else if (mapping[savedId]) {
         currentUser = { ...mapping[savedId], id: savedId };
+        currentTeacherId = mapping[savedId].teacher_id || 'admin';
     }
 
     if (currentUser) {
+        // 設定依據老師 ID
+        if (typeof DatabaseService !== 'undefined') {
+            const settings = await DatabaseService.getSystemSettings(currentTeacherId);
+            isAiMode = (settings && settings.ai_mode) || false;
+            updateAIStatusUI();
+        }
+        
         await loadUserProgress(savedId);
         showDashboard();
     }
@@ -459,7 +496,7 @@ async function finishPractice() {
     userProgress[`${currentNode}_${currentLevel}_score`] = `${correctCount}/${currentQuestions.length}`;
     saveProgress();
 
-    // 存入雲端資料庫 (加入 Await 確保傳送完成)
+    // 存入雲端資料庫 (加入 Await 確保傳送完成，加入 teacher_id 區分)
     const success = await DatabaseService.saveQuizResult(
         currentUser.id,
         currentUser.name,
@@ -467,7 +504,8 @@ async function finishPractice() {
         currentLevel,
         correctCount,
         currentQuestions.length,
-        duration
+        duration,
+        currentTeacherId
     );
 
     if (success) {
@@ -598,13 +636,13 @@ function handleOdsUpload(file) {
             customMapping = newMapping;
             localStorage.setItem('custom_student_mapping', JSON.stringify(newMapping));
 
-            status.textContent = "🔄 正在清理舊資料並同步新名單...";
+            status.textContent = `🔄 正在為教師 [${currentTeacherId}] 清理舊資料並同步新名單...`;
             
-            // 清空雲端的舊有資料 (包含所有舊名單、進度、日誌)
-            await DatabaseService.clearAllDataForNewUpload();
+            // 清空雲端的舊有資料 (包含該老師名下舊名單、進度、日誌)
+            await DatabaseService.clearAllDataForNewUpload(currentTeacherId);
 
             // 同步新名單至雲端
-            await DatabaseService.syncStudents(newMapping);
+            await DatabaseService.syncStudents(newMapping, currentTeacherId);
 
             status.textContent = "✅ 名單更新成功！(舊進度已清除)";
             status.classList.add('success');
@@ -628,10 +666,10 @@ async function renderProgressOverview() {
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center">載入數據中...</td></tr>';
 
-    // 1. 獲取所有「雲端學生名單」與「雲端進度」
+    // 1. 獲取特定教師的「雲端學生名單」與「雲端進度」
     let [cloudStudents, allCloudProgress] = await Promise.all([
-        DatabaseService.getAllStudents().catch(() => []),
-        DatabaseService.getAllProgress().catch(() => [])
+        DatabaseService.getAllStudents(currentTeacherId).catch(() => []),
+        DatabaseService.getAllProgress(currentTeacherId).catch(() => [])
     ]);
 
     // 降級防護：如果雲端因連線或設定問題抓不到名單，但本地已有上傳解析過的 customMapping，就作爲備援顯示
@@ -700,8 +738,8 @@ async function renderActivityLog() {
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center">載入數據中...</td></tr>';
 
-    // 從雲端獲取紀錄
-    const records = await DatabaseService.getAllLogs();
+    // 從雲端獲取該老師的學生紀錄
+    const records = await DatabaseService.getAllLogs(currentTeacherId);
 
     tbody.innerHTML = '';
 
@@ -730,8 +768,8 @@ async function renderActivityLog() {
 }
 
 function clearRecords() {
-    if (confirm("確定要清空雲端活動紀錄嗎？這不會影響學生的練習進度。")) {
-        DatabaseService.clearAllLogs().then(() => {
+    if (confirm(`確定要清空 教師[${currentTeacherId}] 的雲端活動紀錄嗎？這不會影響學生的練習進度。`)) {
+        DatabaseService.clearAllLogs(currentTeacherId).then(() => {
             renderTeacherDashboard();
         });
     }

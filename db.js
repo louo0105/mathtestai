@@ -75,7 +75,7 @@ const DatabaseService = {
     },
 
     // 更新練習進度與紀錄
-    async saveQuizResult(studentId, name, node, level, score, total, duration) {
+    async saveQuizResult(studentId, name, node, level, score, total, duration, teacherId = 'admin') {
         if (!supabaseClient) return;
 
         const accuracy = Math.round((score / total) * 100) + '%';
@@ -90,6 +90,7 @@ const DatabaseService = {
                 level: level,
                 is_completed: true,
                 last_score: scoreStr,
+                teacher_id: teacherId,
                 updated_at: new Date()
             }, { onConflict: 'student_id,node_code,level' });
 
@@ -106,6 +107,7 @@ const DatabaseService = {
                 score: scoreStr,
                 accuracy: accuracy,
                 duration: duration,
+                teacher_id: teacherId,
                 created_at: new Date()
             }]);
 
@@ -118,36 +120,39 @@ const DatabaseService = {
     },
 
     // 教師端：獲取所有學生名單
-    async getAllStudents() {
+    async getAllStudents(teacherId = 'admin') {
         if (!supabaseClient) return [];
         const { data, error } = await supabaseClient
             .from('students')
-            .select('*');
+            .select('*')
+            .eq('teacher_id', teacherId);
         return error ? [] : data;
     },
 
     // 教師端：獲取所有學生的進度統計
-    async getAllProgress() {
+    async getAllProgress(teacherId = 'admin') {
         if (!supabaseClient) return [];
         const { data, error } = await supabaseClient
             .from('practice_progress')
-            .select('*');
+            .select('*')
+            .eq('teacher_id', teacherId);
         return error ? [] : data;
     },
 
     // 教師端：獲取所有活動紀錄 (限前 100 筆)
-    async getAllLogs() {
+    async getAllLogs(teacherId = 'admin') {
         if (!supabaseClient) return [];
         const { data, error } = await supabaseClient
             .from('quiz_logs')
             .select('*')
+            .eq('teacher_id', teacherId)
             .order('created_at', { ascending: false })
             .limit(100);
         return error ? [] : data;
     },
 
     // 教師端：上傳/更新學生名單與弱點
-    async syncStudents(mapping) {
+    async syncStudents(mapping, teacherId = 'admin') {
         if (!supabaseClient) {
             console.error('Supabase 未初始化');
             return;
@@ -155,7 +160,8 @@ const DatabaseService = {
         const studentData = Object.keys(mapping).map(id => ({
             id: id,
             name: mapping[id].name,
-            weak_nodes: mapping[id].weakNodes
+            weak_nodes: mapping[id].weakNodes,
+            teacher_id: teacherId
         }));
 
         const { error } = await supabaseClient
@@ -172,30 +178,29 @@ const DatabaseService = {
     },
 
     // 清空日誌 (老師用)
-    async clearAllLogs() {
+    async clearAllLogs(teacherId = 'admin') {
         if (!supabaseClient) return;
-        // 注意：Supabase Delete 需要 RLS/或是沒有條件
         const { error } = await supabaseClient
             .from('quiz_logs')
             .delete()
-            .neq('student_id', ''); // 刪除所有
+            .eq('teacher_id', teacherId);
         
         if (error) console.error('清空紀錄失敗:', error);
     },
 
     // 上傳新檔案時清空舊有所有的資料 (名單、進度、日誌)
-    async clearAllDataForNewUpload() {
+    async clearAllDataForNewUpload(teacherId = 'admin') {
         if (!supabaseClient) return;
-        console.log("Cleaning old database records...");
-        await supabaseClient.from('practice_progress').delete().neq('student_id', '');
-        await supabaseClient.from('quiz_logs').delete().neq('student_id', '');
-        await supabaseClient.from('students').delete().neq('id', '');
+        console.log("Cleaning old database records for teacher: " + teacherId);
+        await supabaseClient.from('practice_progress').delete().eq('teacher_id', teacherId);
+        await supabaseClient.from('quiz_logs').delete().eq('teacher_id', teacherId);
+        await supabaseClient.from('students').delete().eq('teacher_id', teacherId);
     },
 
     // --- AI 擴充功能 ---
 
     // 獲取全域系統設定 (例如 AI 模式開關) - 加入超時保護
-    async getSystemSettings() {
+    async getSystemSettings(teacherId = 'admin') {
         if (!supabaseClient) return { ai_mode: false };
         
         // 建立一個 3 秒的超時競爭
@@ -207,7 +212,7 @@ const DatabaseService = {
             const fetchSettings = supabaseClient
                 .from('app_settings')
                 .select('*')
-                .eq('id', 'global')
+                .eq('id', teacherId)
                 .single();
             
             // 誰快誰贏
@@ -216,17 +221,17 @@ const DatabaseService = {
             if (error) throw error;
             return data;
         } catch (error) {
-            console.warn('⚠️ 無法獲取雲端設定 (可能網路不穩)，切換為本地模式:', error.message);
+            console.warn(`⚠️ 無法獲取雲端設定 (teacher: ${teacherId})，切換為本地模式:`, error.message);
             return { ai_mode: false };
         }
     },
 
     // 更新系統設定 (老師用)
-    async updateSystemSettings(aiMode) {
+    async updateSystemSettings(aiMode, teacherId = 'admin') {
         if (!supabaseClient) return false;
         const { error } = await supabaseClient
             .from('app_settings')
-            .upsert({ id: 'global', ai_mode: aiMode });
+            .upsert({ id: teacherId, ai_mode: aiMode });
         
         if (error) {
             console.error('更新設定失敗:', error);
@@ -235,18 +240,34 @@ const DatabaseService = {
         return true;
     },
 
-    // 呼叫雲端函數生成題目
+    // 呼叫雲端函數生成題目 (已優化錯誤處理)
     async generateAIQuestions(nodeCode, description, level) {
         if (!supabaseClient) return null;
         try {
+            console.log(`🤖 正在請求 AI 生成題目: ${nodeCode}...`);
             const { data, error } = await supabaseClient.functions.invoke('ai-question-generator', {
                 body: { nodeCode, level, description }
             });
 
-            if (error) throw error;
-            return data;
+            if (error) {
+                console.error('Edge Function 呼叫失敗:', error);
+                return null;
+            }
+
+            // 檢查回傳的資料中是否包含 AI 端的錯誤訊息
+            if (data && data.error) {
+                console.warn('AI 生成過程中斷:', data.error);
+                return null;
+            }
+
+            // 確保回傳內容是陣列且有題目
+            if (Array.isArray(data) && data.length > 0) {
+                return data;
+            }
+
+            return null;
         } catch (err) {
-            console.error('AI 出題失敗:', err);
+            console.error('AI 通訊過程發生異常:', err);
             return null;
         }
     }

@@ -10,7 +10,11 @@ CREATE TABLE IF NOT EXISTS app_settings (
 
 -- 2. 插入初始資料 (若不存在)
 INSERT INTO app_settings (id, ai_mode) 
-VALUES ('global', FALSE)
+VALUES 
+    ('admin', FALSE),
+    ('admin3', FALSE),
+    ('admin4', FALSE),
+    ('admin6', FALSE)
 ON CONFLICT (id) DO NOTHING;
 
 -- 3. 設定權限 (RLS)
@@ -25,6 +29,11 @@ USING (true);
 CREATE POLICY "Allow all for authenticated/public for demo"
 ON app_settings FOR ALL
 USING (true);
+
+-- 4. 🏮 新增多教師支援 (Teacher ID 欄位)
+ALTER TABLE students ADD COLUMN IF NOT EXISTS teacher_id TEXT DEFAULT 'admin';
+ALTER TABLE practice_progress ADD COLUMN IF NOT EXISTS teacher_id TEXT DEFAULT 'admin';
+ALTER TABLE quiz_logs ADD COLUMN IF NOT EXISTS teacher_id TEXT DEFAULT 'admin';
 
 -- 🏮 學生與進度表的調整 (確保 RLS 開放)
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;

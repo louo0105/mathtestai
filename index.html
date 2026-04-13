@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>學力檢測考古題強化練習系統</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=17">
 </head>
 
 <body>
@@ -197,8 +197,8 @@
         </div>
     </div>
 
-    <!-- AI 出題 Loading 遮罩 -->
-    <div id="ai-loading-overlay" class="loading-overlay hidden">
+    <!-- AI 出題 Loading 遮罩 - 加上強制隱藏物理屬性 -->
+    <div id="ai-loading-overlay" class="loading-overlay hidden" style="display: none !important;">
         <div class="loading-content">
             <div class="spinner"></div>
             <h3>正在為您量身打造 AI 題目...</h3>
@@ -209,9 +209,9 @@
     <!-- 將腳本移至底部，並加入 defer 避免網路不穩卡住畫面 -->
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-    <script src="db.js?v=16" defer></script>
-    <script src="data.js?v=16" defer></script>
-    <script src="extra_data.js?v=16" defer></script>
-    <script src="app.js?v=16" defer></script>
+    <script src="db.js?v=18" defer></script>
+    <script src="data.js?v=18" defer></script>
+    <script src="extra_data.js?v=18" defer></script>
+    <script src="app.js?v=18" defer></script>
 </body>
 </html>
