@@ -619,12 +619,18 @@ function handleOdsUpload(file) {
 
                 const weakNodes = [];
                 for (let colIdx of rateColIndices) {
-                    const cellValue = row[colIdx];
-                    // 若答對率為 0 或字串 '0' 即為弱點 (或為 NaN, null 依據 Excel 空白處理)
-                    if (cellValue === 0 || cellValue === '0') {
+                    let cellVal = String(row[colIdx] !== undefined ? row[colIdx] : "").trim();
+                    
+                    if (cellVal === "" || cellVal === "-") continue; // 略過無效格子
+
+                    let numericVal = parseFloat(cellVal.replace('%', ''));
+
+                    // 依據規則：答對率100就不列為弱點，答對率0才需要列為弱點
+                    if (!isNaN(numericVal) && numericVal === 0) {
                         weakNodes.push(colToNodeCode[colIdx]);
                     }
                 }
+
 
                 newMapping[id] = {
                     name: name,
