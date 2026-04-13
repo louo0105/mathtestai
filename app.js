@@ -23,9 +23,11 @@ let customMapping = JSON.parse(localStorage.getItem('custom_student_mapping'));
 let currentTeacherId = 'admin'; // 當前登入學生的指導老師或系統管理員 ID
 let isAiMode = false; // 目前所在環境的 AI 模式狀態
 
-// 獲取目前的學生清單（優先使用自定義）
+// 獲取目前的學生清單（優先使用自定義，區分老師）
 function getMapping() {
-    return customMapping || STUDENT_MAPPING;
+    const teacherMappingStr = localStorage.getItem(`custom_mapping_${currentTeacherId}`);
+    const teacherMapping = teacherMappingStr ? JSON.parse(teacherMappingStr) : null;
+    return teacherMapping || STUDENT_MAPPING;
 }
 
 // 將 Python 生成的額外題庫合併進原有題庫中
@@ -164,14 +166,16 @@ async function handleLogin() {
 
     // 優先從資料庫撈取，若無則用本地 mapping
     let studentData = await DatabaseService.getStudent(num);
-    const mapping = getMapping();
 
     if (studentData) {
         currentUser = { ...studentData, weakNodes: studentData.weak_nodes };
         currentTeacherId = studentData.teacher_id || 'admin';
-    } else if (mapping[num]) {
-        currentUser = { ...mapping[num], id: num };
-        currentTeacherId = mapping[num].teacher_id || 'admin';
+    } else {
+        const mapping = getMapping(); // 依據當前偵測到的老師 ID 獲取名單
+        if (mapping[num]) {
+            currentUser = { ...mapping[num], id: num };
+            currentTeacherId = mapping[num].teacher_id || 'admin';
+        }
     }
 
     if (currentUser) {
@@ -640,8 +644,9 @@ function handleOdsUpload(file) {
                 };
             }
 
+            // 更新本地與全域狀態 (區分老師)
+            localStorage.setItem(`custom_mapping_${currentTeacherId}`, JSON.stringify(newMapping));
             customMapping = newMapping;
-            localStorage.setItem('custom_student_mapping', JSON.stringify(newMapping));
 
             status.textContent = `🔄 正在為教師 [${currentTeacherId}] 清理舊資料並同步新名單...`;
             
