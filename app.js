@@ -578,115 +578,105 @@ function handleOdsUpload(file) {
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
             const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
 
-            // 解析邏輯 (更具彈性的新版 ODS MultiIndex 格式)
+            // 1. 初始化資料結構
             const newMapping = {};
-            
-            // 找出包含標題的列 (前 3 列)
             const headerRow0 = jsonData[0] || []; 
+            const headerRow1 = jsonData[1] || []; 
             const headerRow2 = jsonData[2] || []; 
             
-            const rateColIndices = [];
-            const colToNodeCode = {};
+            // 2. 第一階段：建立知識點欄位索引地圖 (處理合併儲存格邏輯)
+            const nodeGroups = {}; // { "N-5-1": [10, 11, 12, 13, 14], ... }
+            let activeNodeCode = null;
 
-            // 掃描表頭，精準抓取「節點總結」欄位
             for (let j = 0; j < Math.max(headerRow0.length, headerRow2.length); j++) {
                 const cell0 = String(headerRow0[j] || "").trim();
-                const cell2 = String(headerRow2[j] || "").trim();
                 
-                // 只看「第一列有寫內容」的欄位
+                // 如果第一列有新的節點代碼，更新目前追蹤的節點
                 if (cell0 !== "" && cell0 !== "undefined" && cell0 !== "學生" && cell0 !== "完成率") {
-                    let nodeCode = cell0.split(' ')[0].toUpperCase();
-                    
-                    // 關鍵過濾：必須包含「-」才是節點，且該欄位的第三列必須是「答對率」
-                    if (nodeCode.includes('-') && cell2.includes('答對率')) {
-                        const desc = cell0.split(' ').slice(1).join(' ').trim() || nodeCode;
-                        
-                        // 紀錄節點描述
+                    const code = cell0.split(' ')[0].toUpperCase();
+                    if (code.includes('-')) {
+                        activeNodeCode = code;
+                        // 紀錄描述
+                        const desc = cell0.split(' ').slice(1).join(' ').trim() || code;
                         if (typeof window.NODES_DESCRIPTIONS !== 'undefined') {
-                             window.NODES_DESCRIPTIONS[nodeCode] = desc;
+                             window.NODES_DESCRIPTIONS[code] = desc;
                         }
-
-                        rateColIndices.push(j);
-                        colToNodeCode[j] = nodeCode;
-                        console.log(`✅ 成功鎖定節點總結欄位: [第 ${j} 欄] 代碼: ${nodeCode}`);
+                    } else {
+                        activeNodeCode = null; // 遇到非節點標題，重置
                     }
+                }
+
+                // 將該欄位加入當前節點的管轄範圍
+                if (activeNodeCode) {
+                    if (!nodeGroups[activeNodeCode]) nodeGroups[activeNodeCode] = [];
+                    nodeGroups[activeNodeCode].push(j);
                 }
             }
 
-            // 從第 4 列開始讀取學生資料
+            // 3. 第二階段：解析每位學生的資料
             let fallbackId = 1;
             for (let i = 3; i < jsonData.length; i++) {
                 const row = jsonData[i];
                 if (!row || row.length === 0) continue;
 
-                // 姓名位於第一欄
+                // 解析姓名與 ID
                 let nameStr = String(row[0] || "").trim();
-                if (!nameStr || nameStr === 'undefined' || nameStr === '') continue;
+                if (!nameStr || nameStr === 'undefined') continue;
 
-                // 彈性解析 ID (年級 + 座號2碼格式，例如 502) 和姓名
                 let id = String(fallbackId);
                 let name = nameStr;
-                
                 const matchGrade = nameStr.match(/(\d+)年/);
                 const matchNum = nameStr.match(/(\d+)號/);
-
                 if (matchNum) {
                     let numStr = matchNum[1].padStart(2, '0');
-                    if (matchGrade) {
-                        id = matchGrade[1] + numStr; // 例如 "5" + "02" = "502"
-                    } else {
-                        id = numStr; // 若無年級則至少保留兩碼 "02"
-                    }
-                    // 去除 "x號" 等前綴保留姓名
+                    id = matchGrade ? matchGrade[1] + numStr : numStr;
                     name = nameStr.replace(/.*?(\d+)號\s*/, '').trim(); 
                 } else if (nameStr.match(/^\d+/)) {
-                     // 若開頭是純數字例如 "5 林小明" 但沒寫「號」字
                      let numRaw = nameStr.match(/^(\d+)/)[1];
                      id = matchGrade ? matchGrade[1] + numRaw.padStart(2, '0') : numRaw.padStart(2, '0');
                      name = nameStr.replace(/^\d+\s*/, '').trim();
-                } else {
-                    fallbackId++;
-                }
-                
-                if (name === "") name = nameStr; // 如果切完變空的，保留原狀
+                } else { fallbackId++; }
+                if (name === "") name = nameStr;
 
+                // 4. 第三階段：核心弱點判定 (只要區塊內有 0 或 未通過)
                 const weakNodes = [];
-                for (let colIdx of rateColIndices) {
-                    let cellVal = String(row[colIdx] !== undefined ? row[colIdx] : "").trim();
-                    
-                    if (cellVal === "" || cellVal === "-") continue; // 略過無效格子
-
-                    let numericVal = parseFloat(cellVal.replace('%', ''));
-
-                    // 依據規則：答對率100就不列為弱點，答對率0才需要列為弱點
-                    if (!isNaN(numericVal) && numericVal === 0) {
-                        weakNodes.push(colToNodeCode[colIdx]);
+                for (let code in nodeGroups) {
+                    const cols = nodeGroups[code];
+                    let isWeak = false;
+                    for (let cIdx of cols) {
+                        let val = String(row[cIdx] !== undefined ? row[cIdx] : "").trim();
+                        if (val === "" || val === "-") continue;
+                        
+                        let num = parseFloat(val.replace('%', ''));
+                        if ((!isNaN(num) && num === 0) || val.includes('未通過')) {
+                            isWeak = true;
+                            break;
+                        }
                     }
+                    if (isWeak) weakNodes.push(code);
                 }
-
 
                 newMapping[id] = {
                     name: name,
                     fullName: nameStr,
-                    weakNodes: [...new Set(weakNodes)] // 去除重複
+                    weakNodes: [...new Set(weakNodes)]
                 };
             }
 
-            // 更新本地與全域狀態 (區分老師)
+            // 5. 更新本地儲存與全域狀態
             localStorage.setItem(`custom_mapping_${currentTeacherId}`, JSON.stringify(newMapping));
             customMapping = newMapping;
 
             status.textContent = `🔄 正在為教師 [${currentTeacherId}] 清理舊資料並同步新名單...`;
             
-            // 清空雲端的舊有資料 (包含該老師名下舊名單、進度、日誌)
+            // 6. 清空雲端的舊有資料並同步
             await DatabaseService.clearAllDataForNewUpload(currentTeacherId);
-
-            // 同步新名單至雲端
             await DatabaseService.syncStudents(newMapping, currentTeacherId);
 
-            status.textContent = "✅ 名單更新成功！(舊進度已清除)";
+            status.textContent = "✅ 名單與弱點抓取更新成功！";
             status.classList.add('success');
             renderTeacherDashboard();
+
         } catch (err) {
             console.error(err);
             status.textContent = "❌ 解析失敗，請檢查檔案格式。";
