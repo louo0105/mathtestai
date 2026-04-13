@@ -557,16 +557,15 @@ function handleOdsUpload(file) {
             const colToNodeCode = {};
             
             // 掃描第三列，找出所有的 "答對率"
-            // 並對應到第一列的最新一個有效（非空白、非 "學生"）字串作為 NodeCode
+            // 並對應到第一列的最新一個有效字串作為 NodeCode
             let currentNodeCode = "未命名節點";
             for (let j = 0; j < Math.max(headerRow0.length, headerRow2.length); j++) {
                 const cell0 = String(headerRow0[j] || "").trim();
                 
-                // 如果該欄上方有新的節點名稱，就更新 currentNodeCode
+                // 如果該欄上方有內容，更新目前的節點代碼
                 if (cell0 !== "" && cell0 !== "undefined" && cell0 !== "學生" && cell0 !== "完成率") {
-                    currentNodeCode = cell0.split(' ')[0].toUpperCase(); // 嘗試取第一個詞作為代碼，或整個保留
+                    currentNodeCode = cell0.split(' ')[0].toUpperCase();
                     
-                    // 動態將此節點名稱紀錄起來，供前端卡片顯示使用
                     const desc = cell0.split(' ').slice(1).join(' ').trim() || currentNodeCode;
                     if (typeof window.NODES_DESCRIPTIONS !== 'undefined') {
                          window.NODES_DESCRIPTIONS[currentNodeCode] = desc;
@@ -574,11 +573,15 @@ function handleOdsUpload(file) {
                 }
                 
                 const cell2 = String(headerRow2[j] || "").trim();
-                if (cell2.includes('答對率')) {
+                
+                // 【核心修正】只偵測關鍵字「答對率」，且該代碼必須包含「-」(節點特徵)，避免抓到練習題案
+                if (cell2.includes('答對率') && currentNodeCode.includes('-')) {
                     rateColIndices.push(j);
                     colToNodeCode[j] = currentNodeCode;
+                    console.log(`📍 鎖定節點欄位: [${j}] ${currentNodeCode}`);
                 }
             }
+
 
             // 從第 4 列開始讀取學生資料
             let fallbackId = 1;
