@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>學力檢測考古題強化練習系統</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- 引入 SheetJS 處理 ODS/Excel 檔案 -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="db.js?v=15"></script>
+</head>
+
+<body>
+    <div id="app">
+        <!-- 登入頁面 -->
+        <div id="login-page" class="page active">
+            <div class="login-container">
+                <header>
+                    <h1 class="premium-title">考古題強化練習</h1>
+                    <p class="subtitle">讓學習更精準，進步更輕鬆</p>
+                </header>
+                <div class="login-card glass">
+                    <h2>學生登入</h2>
+                    <p>請輸入您的號碼開始練習</p>
+                    <div class="input-group">
+                        <input type="text" id="student-number" placeholder="您的號碼 (例: 502, 515...)">
+                        <button id="login-btn" class="btn-primary">進入系統</button>
+                    </div>
+                    <p id="login-error" class="error-msg"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 儀表板頁面 -->
+        <div id="dashboard-page" class="page">
+            <nav class="navbar glass">
+                <div class="nav-content">
+                    <span class="brand">練習系統</span>
+                    <div class="user-info">
+                        <span id="user-name"></span>
+                        <button id="logout-btn" class="btn-outline">登出</button>
+                    </div>
+                </div>
+            </nav>
+            <main class="container">
+                <header class="dashboard-header">
+                    <div class="header-main">
+                        <h1>您的弱點強化清單</h1>
+                        <p>根據分析結果，我們為您準備了專屬練習</p>
+                    </div>
+                    <div class="difficulty-selector glass">
+                        <span>練習難度：</span>
+                        <div class="difficulty-tabs">
+                            <button class="diff-tab active" data-level="beginner">初級</button>
+                            <button class="diff-tab" data-level="intermediate">中級</button>
+                            <button class="diff-tab" data-level="advanced">高級</button>
+                        </div>
+                    </div>
+                </header>
+                <div id="nodes-grid" class="nodes-grid">
+                    <!-- 節點卡片將由 JS 生成 -->
+                </div>
+            </main>
+        </div>
+
+        <!-- 練習頁面 -->
+        <div id="practice-page" class="page">
+            <nav class="navbar glass">
+                <div class="nav-content">
+                    <button id="back-btn" class="btn-text">← 返回列表</button>
+                    <span id="current-node-title" class="node-title-nav"></span>
+                    <div class="progress-bar-container">
+                        <div id="progress-bar" class="progress-bar"></div>
+                    </div>
+                </div>
+            </nav>
+            <main class="container">
+                <div id="question-container" class="question-card glass">
+                    <div class="question-header">
+                        <span id="question-number" class="badge">第 1 題</span>
+                    </div>
+                    <div class="question-body">
+                        <p id="question-text" class="question-text"></p>
+                        <div id="options-container" class="options-container">
+                            <!-- 選項按鈕將由 JS 生成 -->
+                        </div>
+                    </div>
+                    <div id="feedback-area" class="feedback-area hidden">
+                        <div id="result-banner" class="result-banner"></div>
+                        <div class="ans-item">
+                            <strong>解題思路：</strong>
+                            <p id="explanation-text"></p>
+                        </div>
+                    </div>
+                    <div class="footer-btns">
+                        <button id="prev-btn" class="btn-outline">上一題</button>
+                        <button id="next-btn" class="btn-primary">下一題</button>
+                        <button id="finish-btn" class="btn-primary hidden">完成練習</button>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- 教師後台頁面 -->
+        <div id="teacher-page" class="page">
+            <nav class="navbar glass">
+                <div class="nav-content">
+                    <span class="brand">教師管理後台</span>
+                    <div class="user-info">
+                        <button id="teacher-back-btn" class="btn-outline">返回登入</button>
+                    </div>
+                </div>
+            </nav>
+            <main class="container">
+                <section class="teacher-section card glass">
+                    <h2>更新學生弱點 (上傳 ODS)</h2>
+                    <p class="section-desc">請上傳包含「學號、姓名、答對率」的 ODS 檔案。</p>
+                    <div class="upload-zone" id="drop-zone">
+                        <input type="file" id="ods-input" accept=".ods,.xlsx,.xls" hidden>
+                        <div class="upload-content">
+                            <span class="upload-icon">📄</span>
+                            <p>點擊或拖拽 ODS 檔案至此</p>
+                            <button class="btn-primary"
+                                onclick="document.getElementById('ods-input').click()">選擇檔案</button>
+                        </div>
+                    </div>
+                    <div id="upload-status" class="status-msg"></div>
+                </section>
+
+                <section class="teacher-section card glass">
+                    <div class="section-header">
+                        <h2>線上 AI 出題設定</h2>
+                        <span class="status-badge" id="ai-status-badge">未啟用</span>
+                    </div>
+                    <p class="section-desc">啟用後，系統將自動調用 Google Gemini API 生成即時題目。</p>
+                    <div class="ai-controls">
+                        <div class="toggle-group">
+                            <span>啟用 AI 無限出題模式：</span>
+                            <label class="switch">
+                                <input type="checkbox" id="ai-mode-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <p class="help-text">⚠️ 提示：啟用前請先確保已在 Supabase 後台設定 <code>GEMINI_API_KEY</code>。</p>
+                    </div>
+                </section>
+
+                <section class="teacher-section card glass">
+                    <div class="section-header">
+                        <h2>學生練習進度總覽</h2>
+                        <span class="section-desc">統計每位學生在目前所有弱點節點的完成狀況。</span>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>學號</th>
+                                    <th>姓名</th>
+                                    <th>總弱點數</th>
+                                    <th>已完成(初/中/高)</th>
+                                    <th>完成率</th>
+                                    <th>狀態</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summary-tbody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="teacher-section card glass">
+                    <div class="section-header">
+                        <h2>學生練習活動紀錄</h2>
+                        <div class="header-actions">
+                            <button id="clear-records-btn" class="btn-danger">清空所有紀錄</button>
+                        </div>
+                    </div>
+                    <div class="table-controls">
+                        <input type="text" id="student-search" placeholder="搜尋姓名或學號...">
+                        <button id="refresh-btn" class="btn-outline">重新整理數據</button>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>學號</th>
+                                    <th>姓名</th>
+                                    <th>練習項目</th>
+                                    <th>難度</th>
+                                    <th>正確率</th>
+                                    <th>耗時</th>
+                                    <th>最後練習</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-tbody"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- AI 出題 Loading 遮罩 -->
+    <div id="ai-loading-overlay" class="loading-overlay hidden">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <h3>正在為您量身打造 AI 題目...</h3>
+            <p>老師已啟用線上即時出題模式，請稍候</p>
+        </div>
+    </div>
+
+    <script src="data.js?v=15"></script>
+    <script src="extra_data.js?v=15"></script>
+    <script src="app.js?v=15"></script>
+</body>
+
+</html>
