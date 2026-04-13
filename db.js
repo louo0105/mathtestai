@@ -3,8 +3,8 @@
  */
 
 // 請在此處輸入您的 Supabase 專案網址與 API 金鑰 (anon public)
-const SUPABASE_URL = 'https://nrgasojgdittkjjdaenq.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_fAhlNjD3GzLkTXIdoG-qgg_DcMsTMgc';
+const SUPABASE_URL = 'https://qvepxxnikggexobibsvw.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2ZXB4eG5pa2dnZXhvYmlic3Z3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMzk1OTQsImV4cCI6MjA5MTYxNTU5NH0.XZ44sLqdgtQ9UMx2mNZfI-SyxwRVXQFNr90kpGdrFWE';
 
 let supabaseClient = null;
 
