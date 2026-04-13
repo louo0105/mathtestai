@@ -555,33 +555,31 @@ function handleOdsUpload(file) {
             
             const rateColIndices = [];
             const colToNodeCode = {};
-            
-            // 掃描第三列，找出所有的 "答對率"
-            // 並對應到第一列的最新一個有效字串作為 NodeCode
-            let currentNodeCode = "未命名節點";
+
+            // 掃描表頭，精準抓取「節點總結」欄位
             for (let j = 0; j < Math.max(headerRow0.length, headerRow2.length); j++) {
                 const cell0 = String(headerRow0[j] || "").trim();
-                
-                // 如果該欄上方有內容，更新目前的節點代碼
-                if (cell0 !== "" && cell0 !== "undefined" && cell0 !== "學生" && cell0 !== "完成率") {
-                    currentNodeCode = cell0.split(' ')[0].toUpperCase();
-                    
-                    const desc = cell0.split(' ').slice(1).join(' ').trim() || currentNodeCode;
-                    if (typeof window.NODES_DESCRIPTIONS !== 'undefined') {
-                         window.NODES_DESCRIPTIONS[currentNodeCode] = desc;
-                    }
-                }
-                
                 const cell2 = String(headerRow2[j] || "").trim();
                 
-                // 【核心修正】只偵測關鍵字「答對率」，且該代碼必須包含「-」(節點特徵)，避免抓到練習題案
-                if (cell2.includes('答對率') && currentNodeCode.includes('-')) {
-                    rateColIndices.push(j);
-                    colToNodeCode[j] = currentNodeCode;
-                    console.log(`📍 鎖定節點欄位: [${j}] ${currentNodeCode}`);
+                // 只看「第一列有寫內容」的欄位
+                if (cell0 !== "" && cell0 !== "undefined" && cell0 !== "學生" && cell0 !== "完成率") {
+                    let nodeCode = cell0.split(' ')[0].toUpperCase();
+                    
+                    // 關鍵過濾：必須包含「-」才是節點，且該欄位的第三列必須是「答對率」
+                    if (nodeCode.includes('-') && cell2.includes('答對率')) {
+                        const desc = cell0.split(' ').slice(1).join(' ').trim() || nodeCode;
+                        
+                        // 紀錄節點描述
+                        if (typeof window.NODES_DESCRIPTIONS !== 'undefined') {
+                             window.NODES_DESCRIPTIONS[nodeCode] = desc;
+                        }
+
+                        rateColIndices.push(j);
+                        colToNodeCode[j] = nodeCode;
+                        console.log(`✅ 成功鎖定節點總結欄位: [第 ${j} 欄] 代碼: ${nodeCode}`);
+                    }
                 }
             }
-
 
             // 從第 4 列開始讀取學生資料
             let fallbackId = 1;
