@@ -23,37 +23,55 @@ function initSupabase() {
 }
 
 const DatabaseService = {
-    // 獲取學生完整資料 (含弱點)
+    // 獲取學生完整資料 (含弱點) - 加入超時保護
     async getStudent(id) {
         if (!supabaseClient) return null;
-        const { data, error } = await supabaseClient
-            .from('students')
-            .select('*')
-            .eq('id', id)
-            .single();
-        if (error) {
-            console.error('獲取學生失敗:', error);
+        try {
+            const fetchTask = supabaseClient
+                .from('students')
+                .select('*')
+                .eq('id', id)
+                .single();
+            
+            const { data, error } = await Promise.race([
+                fetchTask,
+                new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 3000))
+            ]);
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.warn('獲取學生失敗 (超時或錯誤):', error.message);
             return null;
         }
-        return data;
     },
 
-    // 獲取該學生的所有練習進度
+    // 獲取該學生的所有練習進度 - 加入超時保護
     async getProgress(studentId) {
         if (!supabaseClient) return {};
-        const { data, error } = await supabaseClient
-            .from('practice_progress')
-            .select('*')
-            .eq('student_id', studentId);
-        
-        if (error) return {};
-        
-        const progressObj = {};
-        data.forEach(item => {
-            progressObj[`${item.node_code}_${item.level}`] = item.is_completed;
-            progressObj[`${item.node_code}_${item.level}_score`] = item.last_score;
-        });
-        return progressObj;
+        try {
+            const fetchTask = supabaseClient
+                .from('practice_progress')
+                .select('*')
+                .eq('student_id', studentId);
+            
+            const { data, error } = await Promise.race([
+                fetchTask,
+                new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 3000))
+            ]);
+
+            if (error || !data) return {};
+            
+            const progressObj = {};
+            data.forEach(item => {
+                progressObj[`${item.node_code}_${item.level}`] = item.is_completed;
+                progressObj[`${item.node_code}_${item.level}_score`] = item.last_score;
+            });
+            return progressObj;
+        } catch (error) {
+            console.warn('獲取進度失敗:', error.message);
+            return {};
+        }
     },
 
     // 更新練習進度與紀錄

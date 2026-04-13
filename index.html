@@ -6,10 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>學力檢測考古題強化練習系統</title>
     <link rel="stylesheet" href="style.css">
-    <!-- 引入 SheetJS 處理 ODS/Excel 檔案 -->
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="db.js?v=15"></script>
 </head>
 
 <body>
@@ -210,9 +206,12 @@
         </div>
     </div>
 
-    <script src="data.js?v=15"></script>
-    <script src="extra_data.js?v=15"></script>
-    <script src="app.js?v=15"></script>
+    <!-- 將腳本移至底部，並加入 defer 避免網路不穩卡住畫面 -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+    <script src="db.js?v=16" defer></script>
+    <script src="data.js?v=16" defer></script>
+    <script src="extra_data.js?v=16" defer></script>
+    <script src="app.js?v=16" defer></script>
 </body>
-
 </html>

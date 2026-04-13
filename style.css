@@ -167,7 +167,7 @@ input:focus { border-color: var(--primary); }
 .result-banner.success { color: var(--success); }
 .result-banner.error { color: var(--error); }
 
-.hidden { display: none; }
+.hidden { display: none !important; }
 .ans-item strong { color: var(--primary); display: block; margin-bottom: 5px; }
 
 .footer-btns { display: flex; justify-content: space-between; margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px; }
