@@ -176,20 +176,31 @@ const DatabaseService = {
 
     // --- AI 擴充功能 ---
 
-    // 獲取全域系統設定 (例如 AI 模式開關)
+    // 獲取全域系統設定 (例如 AI 模式開關) - 加入超時保護
     async getSystemSettings() {
         if (!supabaseClient) return { ai_mode: false };
-        const { data, error } = await supabaseClient
-            .from('app_settings')
-            .select('*')
-            .eq('id', 'global')
-            .single();
         
-        if (error) {
-            console.warn('獲取設定失敗，使用預設值:', error);
+        // 建立一個 3 秒的超時競爭
+        const timeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('連線超時')), 3000)
+        );
+
+        try {
+            const fetchSettings = supabaseClient
+                .from('app_settings')
+                .select('*')
+                .eq('id', 'global')
+                .single();
+            
+            // 誰快誰贏
+            const { data, error } = await Promise.race([fetchSettings, timeout]);
+            
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.warn('⚠️ 無法獲取雲端設定 (可能網路不穩)，切換為本地模式:', error.message);
             return { ai_mode: false };
         }
-        return data;
     },
 
     // 更新系統設定 (老師用)

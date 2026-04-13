@@ -54,14 +54,28 @@ function mergeExtraQuestions() {
 
 // 初始化
 async function init() {
-    mergeExtraQuestions();
-    setupEventListeners();
-    
-    // 獲取全域 AI 設定
-    const settings = await DatabaseService.getSystemSettings();
-    isAiMode = settings.ai_mode;
-    
-    checkAutoLogin();
+    try {
+        console.log("🚀 系統初始化中...");
+        mergeExtraQuestions();
+        setupEventListeners();
+        
+        // 優先顯示登入畫面，避免被後續非同步請求擋住
+        loginPage.classList.add('active');
+
+        // 嘗試獲取雲端設定 (若失敗會被 db.js 的超時保護攔截)
+        if (typeof DatabaseService !== 'undefined') {
+            const settings = await DatabaseService.getSystemSettings();
+            isAiMode = (settings && settings.ai_mode) || false;
+            updateAIStatusUI();
+        }
+        
+        checkAutoLogin();
+        console.log("✅ 初始化完成");
+    } catch (err) {
+        console.error("❌ 初始化發生錯誤:", err);
+        // 即便報錯，也設法讓登入畫面出來
+        loginPage.classList.add('active');
+    }
 }
 
 function setupEventListeners() {
