@@ -328,6 +328,32 @@ function renderNodes() {
     });
 }
 
+// 搜尋節點題目 (含階層式搜尋：若找不到 N-5-1-S01，嘗試 N-5-1，再嘗試 N-5)
+function getHierarchicalQuestions(nodeCode, level) {
+    let currentCode = nodeCode;
+    while (currentCode) {
+        if (QUESTION_BANK[currentCode] && 
+            QUESTION_BANK[currentCode][level] && 
+            QUESTION_BANK[currentCode][level].length > 0) {
+            
+            if (currentCode !== nodeCode) {
+                console.log(`ℹ️ 原節點 [${nodeCode}] 無題，已成功匹配父節點 [${currentCode}] 的題目。`);
+            }
+            return {
+                questions: JSON.parse(JSON.stringify(QUESTION_BANK[currentCode][level])),
+                matchedCode: currentCode
+            };
+        }
+        
+        // 嘗試去掉最後一段 (例如 N-5-1-S01 -> N-5-1)
+        const parts = currentCode.split('-');
+        if (parts.length <= 1) break;
+        parts.pop();
+        currentCode = parts.join('-');
+    }
+    return { questions: [], matchedCode: null };
+}
+
 // 練習邏輯
 window.startPractice = async function (nodeCode) {
     if (nodeCode) nodeCode = String(nodeCode).toUpperCase();
@@ -354,30 +380,32 @@ window.startPractice = async function (nodeCode) {
 
     // --- 本地題庫處理 (Fallback) ---
     if (finalQuestions.length === 0) {
-        // 初始化題庫結構
-        if (!QUESTION_BANK[nodeCode]) {
-            QUESTION_BANK[nodeCode] = { beginner: [], intermediate: [], advanced: [] };
+        // 使用階層式搜尋
+        const { questions: localQuestions, matchedCode } = getHierarchicalQuestions(nodeCode, currentLevel);
+        
+        if (localQuestions.length > 0) {
+            finalQuestions = localQuestions;
+            if (matchedCode !== nodeCode) {
+                const parentLabel = (typeof NODES_DESCRIPTIONS !== 'undefined' && NODES_DESCRIPTIONS[matchedCode]) ? NODES_DESCRIPTIONS[matchedCode] : matchedCode;
+                console.log(`ℹ️ 使用 [${matchedCode}] 替代 [${nodeCode}]`);
+            }
+        }
+        
+        // 【動態防呆】如果連父節點都沒有，才產出防呆題
+        if (finalQuestions.length === 0) {
+            const lvlName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[currentLevel];
+            for(let k=1; k<=5; k++) {
+                finalQuestions.push({
+                    q: `【題庫補充中】針對「${nodeLabel}」目前尚無匹配題目。此為系統產出的防呆題（${lvlName} 第 ${k} 題）。\n\n請問 1+1 等於多少？`,
+                    options: ['2', '3', '4', '5'],
+                    correct: 0,
+                    exp: "系統正在擴充此知識點的題目，請開啟 AI 模式以獲取即時生成題目。"
+                });
+            }
         }
 
-        // 【動態防呆】檢查
-        ['beginner', 'intermediate', 'advanced'].forEach(lvl => {
-            if (!QUESTION_BANK[nodeCode][lvl] || QUESTION_BANK[nodeCode][lvl].length === 0) {
-                QUESTION_BANK[nodeCode][lvl] = [];
-                const lvlName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[lvl];
-                for(let k=1; k<=5; k++) {
-                    QUESTION_BANK[nodeCode][lvl].push({
-                        q: `【動態補上題庫】針對「${nodeLabel}」目前尚無真實題目。此為系統自動產出的防呆替換題（${lvlName} 第 ${k} 題）。\n\n請問 1+1 等於多少？`,
-                        options: ['2', '3', '4', '5'],
-                        correct: 0,
-                        exp: '此題目為臨時佔位用。'
-                    });
-                }
-            }
-        });
-
-        let levelQuestions = QUESTION_BANK[nodeCode][currentLevel];
-        levelQuestions = [...levelQuestions].sort(() => 0.5 - Math.random());
-        finalQuestions = levelQuestions.slice(0, 5);
+        // 隨機打亂並取 5 題
+        finalQuestions = [...finalQuestions].sort(() => 0.5 - Math.random()).slice(0, 5);
     }
 
     if (finalQuestions.length === 0) {
