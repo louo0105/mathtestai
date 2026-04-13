@@ -585,31 +585,36 @@ function handleOdsUpload(file) {
             const headerRow2 = jsonData[2] || []; 
             
             // 2. 第一階段：建立知識點欄位索引地圖 (處理合併儲存格邏輯)
-            const nodeGroups = {}; // { "N-5-1": [10, 11, 12, 13, 14], ... }
+            const nodeGroups = {}; 
             let activeNodeCode = null;
+            let nodeStartIndices = [];
 
+            // 先找出所有起始點
             for (let j = 0; j < Math.max(headerRow0.length, headerRow2.length); j++) {
                 const cell0 = String(headerRow0[j] || "").trim();
-                
-                // 如果第一列有新的節點代碼，更新目前追蹤的節點
                 if (cell0 !== "" && cell0 !== "undefined" && cell0 !== "學生" && cell0 !== "完成率") {
                     const code = cell0.split(' ')[0].toUpperCase();
                     if (code.includes('-')) {
                         activeNodeCode = code;
+                        nodeStartIndices.push({ code: code, start: j });
                         // 紀錄描述
                         const desc = cell0.split(' ').slice(1).join(' ').trim() || code;
                         if (typeof window.NODES_DESCRIPTIONS !== 'undefined') {
                              window.NODES_DESCRIPTIONS[code] = desc;
                         }
-                    } else {
-                        activeNodeCode = null; // 遇到非節點標題，重置
                     }
                 }
+            }
 
-                // 將該欄位加入當前節點的管轄範圍
-                if (activeNodeCode) {
-                    if (!nodeGroups[activeNodeCode]) nodeGroups[activeNodeCode] = [];
-                    nodeGroups[activeNodeCode].push(j);
+            // 根據起始點計算每個節點的管轄範圍 (直到下一個起始點或結束)
+            for (let k = 0; k < nodeStartIndices.length; k++) {
+                const node = nodeStartIndices[k];
+                const start = node.start;
+                const end = (k + 1 < nodeStartIndices.length) ? nodeStartIndices[k + 1].start - 1 : headerRow2.length - 1;
+                
+                nodeGroups[node.code] = [];
+                for (let col = start; col <= end; col++) {
+                    nodeGroups[node.code].push(col);
                 }
             }
 
@@ -638,21 +643,41 @@ function handleOdsUpload(file) {
                 } else { fallbackId++; }
                 if (name === "") name = nameStr;
 
-                // 4. 第三階段：核心弱點判定 (只要區塊內有 0 或 未通過)
+                // 4. 第三階段：核心弱點判定 (只要答對率不是 100，或有「未通過」)
                 const weakNodes = [];
                 for (let code in nodeGroups) {
                     const cols = nodeGroups[code];
                     let isWeak = false;
+
+                    // A. 掃描整個區塊是否有「未通過」
                     for (let cIdx of cols) {
                         let val = String(row[cIdx] !== undefined ? row[cIdx] : "").trim();
-                        if (val === "" || val === "-") continue;
-                        
-                        let num = parseFloat(val.replace('%', ''));
-                        if ((!isNaN(num) && num === 0) || val.includes('未通過')) {
+                        if (val.includes('未通過')) {
                             isWeak = true;
                             break;
                         }
                     }
+
+                    // B. 如果還沒被判為弱點，檢查「答對率」總結欄位
+                    if (!isWeak) {
+                        // 找標題有「率」的欄位，沒有就取最後一欄
+                        let rateCols = cols.filter(cIdx => 
+                            String(headerRow2[cIdx] || "").includes('率') || 
+                            String(headerRow1[cIdx] || "").includes('率') ||
+                            String(headerRow0[cIdx] || "").includes('率')
+                        );
+                        let summaryColIdx = rateCols.length > 0 ? Math.max(...rateCols) : Math.max(...cols);
+                        
+                        let rateVal = String(row[summaryColIdx] !== undefined ? row[summaryColIdx] : "").trim();
+                        if (rateVal !== "" && rateVal !== "-") {
+                            let num = parseFloat(rateVal.replace('%', ''));
+                            // 只若是有效數字且小於 100 (包含 0~99)
+                            if (!isNaN(num) && num < 100) {
+                                isWeak = true;
+                            }
+                        }
+                    }
+
                     if (isWeak) weakNodes.push(code);
                 }
 
