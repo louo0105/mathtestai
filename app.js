@@ -375,19 +375,35 @@ window.startPractice = async function (nodeCode) {
     const nodeLabel = (typeof NODES_DESCRIPTIONS !== 'undefined' && NODES_DESCRIPTIONS[nodeCode]) ? NODES_DESCRIPTIONS[nodeCode] : nodeCode;
     let finalQuestions = [];
 
-    // --- AI 出題模式 ---
+    // --- 即時同步 AI 模式狀態 (確保教師後台開關即時生效) ---
+    if (typeof DatabaseService !== 'undefined') {
+        try {
+            const settings = await DatabaseService.getSystemSettings(currentTeacherId);
+            isAiMode = (settings && settings.ai_mode) || false;
+            updateAIStatusUI(); // 同步 UI 狀態
+            console.log(`🌐 即時同步 AI 模式: ${isAiMode ? '開啟' : '關閉'}`);
+        } catch (e) {
+            console.warn("無法即時同步 AI 模式，將使用上次快取狀態。");
+        }
+    }
+
+    // --- AI 出題模式 (優先權最高) ---
     if (isAiMode) {
         const overlay = document.getElementById('ai-loading-overlay');
-        overlay.classList.remove('hidden');
+        if (overlay) overlay.classList.remove('hidden');
 
-        const aiQuestions = await DatabaseService.generateAIQuestions(nodeCode, nodeLabel, currentLevel);
-        overlay.classList.add('hidden');
-
-        if (aiQuestions && aiQuestions.length >= 5) {
-            finalQuestions = aiQuestions.map(q => ({ ...q, source: '🤖 AI 出題' }));
-            console.log("使用 AI 生成題目成功");
-        } else {
-            console.warn("AI 出題失敗或格式不符，改用本地題庫。");
+        try {
+            const aiQuestions = await DatabaseService.generateAIQuestions(nodeCode, nodeLabel, currentLevel);
+            if (aiQuestions && aiQuestions.length >= 5) {
+                finalQuestions = aiQuestions.map(q => ({ ...q, source: '🤖 AI 出題' }));
+                console.log("✅ 成功使用 AI 即時生成題目");
+            } else {
+                console.warn("AI 生成題目不足或失敗，將切換至備援題庫。");
+            }
+        } catch (err) {
+            console.error("AI 出題過程發生錯誤:", err);
+        } finally {
+            if (overlay) overlay.classList.add('hidden');
         }
     }
 
