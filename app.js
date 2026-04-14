@@ -384,7 +384,7 @@ window.startPractice = async function (nodeCode) {
         overlay.classList.add('hidden');
 
         if (aiQuestions && aiQuestions.length >= 5) {
-            finalQuestions = aiQuestions;
+            finalQuestions = aiQuestions.map(q => ({ ...q, source: '🤖 AI 出題' }));
             console.log("使用 AI 生成題目成功");
         } else {
             console.warn("AI 出題失敗或格式不符，改用本地題庫。");
@@ -397,7 +397,7 @@ window.startPractice = async function (nodeCode) {
         const { questions: localQuestions, matchedCode } = getHierarchicalQuestions(nodeCode, currentLevel);
         
         if (localQuestions.length > 0) {
-            finalQuestions = localQuestions;
+            finalQuestions = localQuestions.map(q => ({ ...q, source: '📚 本地題庫' }));
             if (matchedCode !== nodeCode) {
                 const parentLabel = (typeof NODES_DESCRIPTIONS !== 'undefined' && NODES_DESCRIPTIONS[matchedCode]) ? NODES_DESCRIPTIONS[matchedCode] : matchedCode;
                 console.log(`ℹ️ 使用 [${matchedCode}] 替代 [${nodeCode}]`);
@@ -412,7 +412,8 @@ window.startPractice = async function (nodeCode) {
                     q: `【題庫補充中】針對「${nodeLabel}」目前尚無匹配題目。此為系統產出的防呆題（${lvlName} 第 ${k} 題）。\n\n請問 1+1 等於多少？`,
                     options: ['2', '3', '4', '5'],
                     correct: 0,
-                    exp: "系統正在擴充此知識點的題目，請開啟 AI 模式以獲取即時生成題目。"
+                    exp: "系統正在擴充此知識點的題目，請開啟 AI 模式以獲取即時生成題目。",
+                    source: '⚠️ 防呆代換'
                 });
             }
         }
@@ -441,7 +442,8 @@ window.startPractice = async function (nodeCode) {
 
 function updateQuestionUI() {
     const q = currentQuestions[currentQuestionIndex];
-    document.getElementById('question-number').textContent = `第 ${currentQuestionIndex + 1} / ${currentQuestions.length} 題`;
+    const sourceTag = q.source ? ` <span class="source-badge">${q.source}</span>` : "";
+    document.getElementById('question-number').innerHTML = `第 ${currentQuestionIndex + 1} / ${currentQuestions.length} 題${sourceTag}`;
     document.getElementById('question-text').textContent = q.q;
 
     const optionsContainer = document.getElementById('options-container');
