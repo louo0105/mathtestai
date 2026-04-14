@@ -34,8 +34,15 @@
             <nav class="navbar glass">
                 <div class="nav-content">
                     <span class="brand">練習系統</span>
+                    <div class="user-greeting">
+                        <h1>你好，<span id="user-name">載入中...</span></h1>
+                        <p class="greeting-desc">今天想要挑戰哪一個弱點單元呢？</p>
+                        <!-- 新增 AI 診斷資訊 -->
+                        <div id="ai-diagnostic-info" class="diagnostic-tag glass">
+                            <span class="dot"></span> 正在同步 AI 狀態...
+                        </div>
+                    </div>
                     <div class="user-info">
-                        <span id="user-name"></span>
                         <button id="logout-btn" class="btn-outline">登出</button>
                     </div>
                 </div>

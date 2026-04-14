@@ -197,9 +197,25 @@ async function handleLogin() {
         
         // 依照該學生的老師載入相對應的 AI 設定
         if (typeof DatabaseService !== 'undefined') {
-            const settings = await DatabaseService.getSystemSettings(currentTeacherId);
+            console.log(`🔍 正在同步師生 AI 設定 (Teacher ID: ${currentTeacherId})...`);
+            let settings = await DatabaseService.getSystemSettings(currentTeacherId);
+            
+            // Fallback: 如果該老師沒設定或關閉，檢查管理員 (admin) 是否開啟了全局 AI
+            if ((!settings || !settings.ai_mode) && currentTeacherId !== 'admin') {
+                console.log("ℹ️ 指導老師未開啟 AI，檢查管理員全局設定...");
+                const adminSettings = await DatabaseService.getSystemSettings('admin');
+                if (adminSettings && adminSettings.ai_mode) {
+                    settings = adminSettings;
+                    console.log("✅ 已繼承管理員全局 AI 設定");
+                }
+            }
+            
             isAiMode = (settings && settings.ai_mode) || false;
             updateAIStatusUI();
+            
+            if (isAiMode) {
+                console.log("🤖 AI 出題模式已準備就緒，將優先啟動即時生成。");
+            }
         }
         
         await loadUserProgress(num);
@@ -231,7 +247,17 @@ async function checkAutoLogin() {
     if (currentUser) {
         // 設定依據老師 ID
         if (typeof DatabaseService !== 'undefined') {
-            const settings = await DatabaseService.getSystemSettings(currentTeacherId);
+            console.log(`🔍 自動登入同步 AI 設定 (Teacher ID: ${currentTeacherId})...`);
+            let settings = await DatabaseService.getSystemSettings(currentTeacherId);
+            
+            // Fallback
+            if ((!settings || !settings.ai_mode) && currentTeacherId !== 'admin') {
+                const adminSettings = await DatabaseService.getSystemSettings('admin');
+                if (adminSettings && adminSettings.ai_mode) {
+                    settings = adminSettings;
+                }
+            }
+
             isAiMode = (settings && settings.ai_mode) || false;
             updateAIStatusUI();
         }
@@ -307,6 +333,18 @@ function updateAIStatusUI() {
     if (badge) {
         badge.textContent = isAiMode ? '✓ 啟用中' : '未啟用';
         badge.className = `status-badge ${isAiMode ? 'completed' : ''}`;
+    }
+
+    // 儀表板診斷標籤
+    const diagnostic = document.getElementById('ai-diagnostic-info');
+    if (diagnostic) {
+        if (isAiMode) {
+            diagnostic.classList.add('active');
+            diagnostic.innerHTML = `<span class="dot"></span> 🤖 AI 即時出題：開啟中 (管理員/老師: ${currentTeacherId})`;
+        } else {
+            diagnostic.classList.remove('active');
+            diagnostic.innerHTML = `<span class="dot"></span> 📚 本地題庫模式 (Teacher: ${currentTeacherId})`;
+        }
     }
 }
 
@@ -389,6 +427,7 @@ window.startPractice = async function (nodeCode) {
 
     // --- AI 出題模式 (優先權最高) ---
     if (isAiMode) {
+        showToast("🤖 AI 出題模式：正在即時生成新題目...", "info");
         const overlay = document.getElementById('ai-loading-overlay');
         if (overlay) overlay.classList.remove('hidden');
 
@@ -397,11 +436,14 @@ window.startPractice = async function (nodeCode) {
             if (aiQuestions && aiQuestions.length >= 5) {
                 finalQuestions = aiQuestions.map(q => ({ ...q, source: '🤖 AI 出題' }));
                 console.log("✅ 成功使用 AI 即時生成題目");
+                showToast("✅ AI 題目生成成功", "success");
             } else {
                 console.warn("AI 生成題目不足或失敗，將切換至備援題庫。");
+                showToast("⚠️ AI 生成失敗，已切換至備援題庫", "warning");
             }
         } catch (err) {
             console.error("AI 出題過程發生錯誤:", err);
+            showToast("❌ AI 連線異常", "error");
         } finally {
             if (overlay) overlay.classList.add('hidden');
         }
@@ -409,6 +451,9 @@ window.startPractice = async function (nodeCode) {
 
     // --- 本地題庫處理 (Fallback) ---
     if (finalQuestions.length === 0) {
+        if (isAiMode) {
+             console.log("ℹ️ 由於 AI 無回應，啟動本地備援機制。");
+        }
         // 使用階層式搜尋
         const { questions: localQuestions, matchedCode } = getHierarchicalQuestions(nodeCode, currentLevel);
         
@@ -872,5 +917,47 @@ function showError(msg) {
     loginError.textContent = msg;
     setTimeout(() => { loginError.textContent = ''; }, 3000);
 }
+
+// 通用 UI 提示 (Toast)
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    const colors = {
+        'info': '#007AFF',
+        'success': '#34C759',
+        'warning': '#FF9500',
+        'error': '#FF3B30'
+    };
+    
+    toast.className = 'toast-msg glass';
+    toast.style = `
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: ${colors[type] || colors.info};
+        color: white;
+        padding: 12px 24px;
+        border-radius: 12px;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        z-index: 10000;
+        font-size: 14px;
+        font-weight: 600;
+        animation: toastSlideIn 0.3s ease-out forwards;
+    `;
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.animation = 'toastSlideOut 0.3s ease-in forwards';
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+// 動畫 CSS 動態加入
+const toastStyle = document.createElement('style');
+toastStyle.textContent = `
+    @keyframes toastSlideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes toastSlideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+`;
+document.head.appendChild(toastStyle);
 
 init();

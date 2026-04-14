@@ -250,14 +250,14 @@ const DatabaseService = {
             });
 
             if (error) {
-                console.error('Edge Function 呼叫失敗:', error);
-                return null;
+                console.error('❌ Edge Function 呼叫失敗:', error);
+                throw new Error(`雲端函數調用錯誤 (${error.message})`);
             }
 
             // 檢查回傳的資料中是否包含 AI 端的錯誤訊息
             if (data && data.error) {
-                console.warn('AI 生成過程中斷:', data.error);
-                return null;
+                console.warn('⚠️ AI 生成過程中斷:', data.error);
+                throw new Error(`AI 出題失敗: ${data.error}`);
             }
 
             // 確保回傳內容是陣列且有題目
@@ -265,6 +265,7 @@ const DatabaseService = {
                 return data;
             }
 
+            console.warn("⚠️ AI 回傳格式不符或題目為空:", data);
             return null;
         } catch (err) {
             console.error('AI 通訊過程發生異常:', err);
