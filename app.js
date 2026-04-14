@@ -32,13 +32,21 @@ function getMapping() {
 
 // 將 Python 生成的額外題庫合併進原有題庫中
 function mergeExtraQuestions() {
+    console.log("📥 開始合併額外題庫...");
+    let cleanedCount = 0;
+    let mergedNodes = 0;
+    let totalQuestions = 0;
+
     // 1. 強制清除舊有的假佔位符題目 (避免殘留)
+    // 修正：僅對比特定的預設關鍵字，避免誤刪包含「錯誤」二字的真實題目
     Object.keys(QUESTION_BANK).forEach(node => {
         ['beginner', 'intermediate', 'advanced'].forEach(level => {
             if (QUESTION_BANK[node] && QUESTION_BANK[node][level]) {
+                const before = QUESTION_BANK[node][level].length;
                 QUESTION_BANK[node][level] = QUESTION_BANK[node][level].filter(q => {
-                    return !q.options.some(opt => opt.includes('錯誤值') || opt.includes('正確結果') || opt.includes('錯誤'));
+                    return !q.options.some(opt => opt.includes('錯誤值') || opt.includes('正確結果') || (q.exp && q.exp.includes('基礎題型')));
                 });
+                cleanedCount += (before - QUESTION_BANK[node][level].length);
             }
         });
     });
@@ -46,14 +54,19 @@ function mergeExtraQuestions() {
     // 2. 將新的題庫合併進來
     if (typeof EXTRA_QUESTION_BANK !== 'undefined') {
         for (const node in EXTRA_QUESTION_BANK) {
-            if (!QUESTION_BANK[node]) QUESTION_BANK[node] = { beginner: [], intermediate: [], advanced: [] };
+            const cleanNode = node.trim().toUpperCase();
+            if (!QUESTION_BANK[cleanNode]) QUESTION_BANK[cleanNode] = { beginner: [], intermediate: [], advanced: [] };
+            
+            mergedNodes++;
             for (const level in EXTRA_QUESTION_BANK[node]) {
-                if (!QUESTION_BANK[node][level]) QUESTION_BANK[node][level] = [];
-                // 使用 concat 避免 spread operator (...) 在大數據量下發生堆疊溢位 (Stack Overflow)
-                QUESTION_BANK[node][level] = QUESTION_BANK[node][level].concat(EXTRA_QUESTION_BANK[node][level]);
+                if (!QUESTION_BANK[cleanNode][level]) QUESTION_BANK[cleanNode][level] = [];
+                const extraQs = EXTRA_QUESTION_BANK[node][level];
+                QUESTION_BANK[cleanNode][level] = QUESTION_BANK[cleanNode][level].concat(extraQs);
+                totalQuestions += extraQs.length;
             }
         }
     }
+    console.log(`✅ 題庫整理完畢：清理了 ${cleanedCount} 題預設題，成功合併 ${mergedNodes} 個結點，共 ${totalQuestions} 題額外題目。`);
 }
 
 // 初始化
@@ -330,7 +343,7 @@ function renderNodes() {
 
 // 搜尋節點題目 (含階層式搜尋：若找不到 N-5-1-S01，嘗試 N-5-1，再嘗試 N-5)
 function getHierarchicalQuestions(nodeCode, level) {
-    let currentCode = nodeCode;
+    let currentCode = String(nodeCode || "").trim().toUpperCase();
     while (currentCode) {
         if (QUESTION_BANK[currentCode] && 
             QUESTION_BANK[currentCode][level] && 
@@ -356,7 +369,7 @@ function getHierarchicalQuestions(nodeCode, level) {
 
 // 練習邏輯
 window.startPractice = async function (nodeCode) {
-    if (nodeCode) nodeCode = String(nodeCode).toUpperCase();
+    if (nodeCode) nodeCode = String(nodeCode).trim().toUpperCase();
     currentNode = nodeCode;
     
     const nodeLabel = (typeof NODES_DESCRIPTIONS !== 'undefined' && NODES_DESCRIPTIONS[nodeCode]) ? NODES_DESCRIPTIONS[nodeCode] : nodeCode;
