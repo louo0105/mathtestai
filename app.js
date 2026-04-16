@@ -432,18 +432,21 @@ window.startPractice = async function (nodeCode) {
         if (overlay) overlay.classList.remove('hidden');
 
         try {
+            console.log("🚀 啟動 AI 出題流程...");
             const aiQuestions = await DatabaseService.generateAIQuestions(nodeCode, nodeLabel, currentLevel);
+            
             if (aiQuestions && aiQuestions.length >= 5) {
-                finalQuestions = aiQuestions.map(q => ({ ...q, source: '🤖 AI 出題' }));
+                finalQuestions = aiQuestions.map(q => ({ ...q, source: '🤖 AI 即時生成' }));
                 console.log("✅ 成功使用 AI 即時生成題目");
                 showToast("✅ AI 題目生成成功", "success");
             } else {
-                console.warn("AI 生成題目不足或失敗，將切換至備援題庫。");
-                showToast("⚠️ AI 生成失敗，已切換至備援題庫", "warning");
+                console.warn("AI 生成題目不足，將切換至備援題庫。");
+                showToast("⚠️ AI 生成題目不足，已切換至本地備援", "warning");
             }
         } catch (err) {
-            console.error("AI 出題過程發生錯誤:", err);
-            showToast("❌ AI 連線異常", "error");
+            console.error("❌ AI 出題失敗:", err);
+            // 這裡會顯示從 db.js 拋出的具體錯誤訊息（如：額度已滿）
+            showToast(`❌ AI 出題失敗: ${err.message}`, "error");
         } finally {
             if (overlay) overlay.classList.add('hidden');
         }

@@ -199,13 +199,12 @@ const DatabaseService = {
 
     // --- AI 擴充功能 ---
 
-    // 獲取全域系統設定 (例如 AI 模式開關) - 加入超時保護
     async getSystemSettings(teacherId = 'admin') {
         if (!supabaseClient) return { ai_mode: false };
         
-        // 建立一個 3 秒的超時競爭
+        console.log(`📡 正在從 Supabase 同步系統設定 (Teacher: ${teacherId})...`);
         const timeout = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('連線超時')), 3000)
+            setTimeout(() => reject(new Error('連線超時')), 5000)
         );
 
         try {
@@ -215,13 +214,16 @@ const DatabaseService = {
                 .eq('id', teacherId)
                 .single();
             
-            // 誰快誰贏
             const { data, error } = await Promise.race([fetchSettings, timeout]);
             
-            if (error) throw error;
-            return data;
+            if (error) {
+                console.warn(`⚠️ Supabase 設定讀取錯誤: ${error.message}`);
+                return { ai_mode: false };
+            }
+            console.log(`✅ 設定同步成功: AI 模式 = ${data?.ai_mode ? '開啟' : '關閉'}`);
+            return data || { ai_mode: false };
         } catch (error) {
-            console.warn(`⚠️ 無法獲取雲端設定 (teacher: ${teacherId})，切換為本地模式:`, error.message);
+            console.warn(`⚠️ AI 設定同步失敗 (切換為安全模式):`, error.message);
             return { ai_mode: false };
         }
     },
@@ -251,13 +253,17 @@ const DatabaseService = {
 
             if (error) {
                 console.error('❌ Edge Function 呼叫失敗:', error);
-                throw new Error(`雲端函數調用錯誤 (${error.message})`);
+                throw new Error(`雲端連線失敗 (${error.message || '請檢查網路'})`);
             }
 
             // 檢查回傳的資料中是否包含 AI 端的錯誤訊息
             if (data && data.error) {
-                console.warn('⚠️ AI 生成過程中斷:', data.error);
-                throw new Error(`AI 出題失敗: ${data.error}`);
+                console.warn('⚠️ AI 生成中斷:', data.error);
+                // 如果是頻率限制，回傳更白話的錯誤
+                if (data.error.includes("429")) {
+                    throw new Error("Google AI 額度已滿或請求太快，請等待 1 分鐘後再試。");
+                }
+                throw new Error(data.error);
             }
 
             // 確保回傳內容是陣列且有題目
