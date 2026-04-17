@@ -275,7 +275,11 @@ const DatabaseService = {
             return null;
         } catch (err) {
             console.error('AI 通訊過程發生異常:', err);
-            return null;
+            // 提取核心錯誤訊息
+            let msg = err.message || "未知錯誤";
+            if (msg.includes("429")) msg = "AI 出題額度已達上限（或是請求太頻繁），請稍候 30 秒再試。";
+            if (msg.includes("503")) msg = "AI 伺服器目前忙碌中，請點擊「再次挑戰」重試。";
+            throw new Error(msg);
         }
     }
 };
