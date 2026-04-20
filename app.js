@@ -44,7 +44,10 @@ function mergeExtraQuestions() {
             if (QUESTION_BANK[node] && QUESTION_BANK[node][level]) {
                 const before = QUESTION_BANK[node][level].length;
                 QUESTION_BANK[node][level] = QUESTION_BANK[node][level].filter(q => {
-                    return !q.options.some(opt => opt.includes('錯誤值') || opt.includes('正確結果') || (q.exp && q.exp.includes('基礎題型')));
+                    const isFake1 = q.options.some(opt => opt.includes('錯誤值') || opt.includes('正確結果'));
+                    const isFake2 = q.exp && q.exp.includes('基礎題型');
+                    const isFake3 = q.options.some(opt => opt.includes('此為正確的觀念描述') || opt.includes('該觀念的錯誤誤解') || opt.includes('完全不相干的描述'));
+                    return !isFake1 && !isFake2 && !isFake3;
                 });
                 cleanedCount += (before - QUESTION_BANK[node][level].length);
             }
