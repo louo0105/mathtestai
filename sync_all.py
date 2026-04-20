@@ -7,21 +7,11 @@ from process_ods_to_db import run_ods_sync
 from refresh_bank import get_node_descriptions, load_existing_extra_bank, generate_questions, EXTRA_DATA_PATH, CHECKPOINT_PATH
 import refresh_bank
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-
 def main():
-    global GROQ_API_KEY
-    if not GROQ_API_KEY:
-        print("[Error] GROQ_API_KEY is not set in environment variables.")
-        key = input("Please enter your GROQ_API_KEY: ").strip()
-        if not key:
-            return
-        os.environ["GROQ_API_KEY"] = key
-        refresh_bank.GROQ_API_KEY = key  # 同步更新 refresh_bank 模組中的 key
-
     print("\n" + "="*50)
     print("[AI Exam Tool] All-in-One Sync")
     print("="*50)
+
 
     # 第一階段：同步學生 ODS 數據
     print("\n[Step 1] Syncing Student ODS Data...")
@@ -105,10 +95,20 @@ def main():
     
     confirm = input("\nGenerate questions for missing nodes via AI? (y/n): ").strip().lower()
     if confirm != 'y':
-        print("[Skip] Skipping question generation.")
+        print("\n[Skip] Skipping AI generation. You can manually fill these gaps in extra_data.js.")
         return
 
-    # 第三階段：執行補題
+    # 第三階段：執行補題 (此時才檢查 API Key)
+    global GROQ_API_KEY
+    if not GROQ_API_KEY:
+        print("\n[Auth] GROQ_API_KEY not found in environment.")
+        key = input("Please enter your GROQ_API_KEY to proceed (or press Enter to cancel): ").strip()
+        if not key:
+            print("[Cancel] AI generation cancelled by user.")
+            return
+        GROQ_API_KEY = key
+        refresh_bank.GROQ_API_KEY = key
+
     print("\n[Step 3] Launching AI Engine...")
     
     new_bank = existing_extra.copy()
