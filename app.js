@@ -731,31 +731,40 @@ function handleOdsUpload(file) {
                     const cols = nodeGroups[code];
                     let isWeak = false;
 
-                    // A. 掃描整個區塊是否有「未通過」
+                    // A. 掃描整個區塊是否有「未通過」或「為 0」
                     for (let cIdx of cols) {
                         let val = String(row[cIdx] !== undefined ? row[cIdx] : "").trim();
                         if (val.includes('未通過')) {
                             isWeak = true;
                             break;
                         }
+                        // 若檔案內容是數字分數 (0 或 1)，只要有 0 就視為弱點
+                        if (val !== "" && val !== "-") {
+                            let fVal = parseFloat(val);
+                            if (!isNaN(fVal) && fVal === 0) {
+                                isWeak = true;
+                                break;
+                            }
+                        }
                     }
 
-                    // B. 如果還沒被判為弱點，檢查「答對率」總結欄位
+                    // B. 如果還沒被判為弱點，且存在「答對率」欄位，才進行百分比檢查
                     if (!isWeak) {
-                        // 找標題有「率」的欄位，沒有就取最後一欄
                         let rateCols = cols.filter(cIdx => 
                             String(headerRow2[cIdx] || "").includes('率') || 
                             String(headerRow1[cIdx] || "").includes('率') ||
                             String(headerRow0[cIdx] || "").includes('率')
                         );
-                        let summaryColIdx = rateCols.length > 0 ? Math.max(...rateCols) : Math.max(...cols);
                         
-                        let rateVal = String(row[summaryColIdx] !== undefined ? row[summaryColIdx] : "").trim();
-                        if (rateVal !== "" && rateVal !== "-") {
-                            let num = parseFloat(rateVal.replace('%', ''));
-                            // 只若是有效數字且小於 100 (包含 0~99)
-                            if (!isNaN(num) && num < 100) {
-                                isWeak = true;
+                        if (rateCols.length > 0) {
+                            let summaryColIdx = Math.max(...rateCols);
+                            let rateVal = String(row[summaryColIdx] !== undefined ? row[summaryColIdx] : "").trim();
+                            if (rateVal !== "" && rateVal !== "-") {
+                                let num = parseFloat(rateVal.replace('%', ''));
+                                // 只要有效數字且小於 100，視為弱點
+                                if (!isNaN(num) && num < 100) {
+                                    isWeak = true;
+                                }
                             }
                         }
                     }
