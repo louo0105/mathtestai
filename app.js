@@ -712,16 +712,29 @@ function handleOdsUpload(file) {
 
                 let id = String(fallbackId);
                 let name = nameStr;
-                const matchGrade = nameStr.match(/(\d+)年/);
+                
+                // 擴充支援：中文年級轉數字 (例如 "三年" -> "3", "五年" -> "5")
+                const gradeMap = { "一": "1", "二": "2", "三": "3", "四": "4", "五": "5", "六": "6" };
+                let gradeNum = "";
+                
+                const matchGradeNum = nameStr.match(/(\d+)年/);
+                const matchGradeChi = nameStr.match(/([一二三四五六])年/);
+                
+                if (matchGradeNum) {
+                    gradeNum = matchGradeNum[1];
+                } else if (matchGradeChi) {
+                    gradeNum = gradeMap[matchGradeChi[1]];
+                }
+                
                 const matchNum = nameStr.match(/(\d+)號/);
                 if (matchNum) {
                     let numStr = matchNum[1].padStart(2, '0');
-                    id = matchGrade ? matchGrade[1] + numStr : numStr;
+                    id = gradeNum ? gradeNum + numStr : numStr;
                     name = nameStr.replace(/.*?(\d+)號\s*/, '').trim(); 
                 } else if (nameStr.match(/^\d+/)) {
-                     let numRaw = nameStr.match(/^(\d+)/)[1];
-                     id = matchGrade ? matchGrade[1] + numRaw.padStart(2, '0') : numRaw.padStart(2, '0');
-                     name = nameStr.replace(/^\d+\s*/, '').trim();
+                    let numRaw = nameStr.match(/^(\d+)/)[1];
+                    id = gradeNum ? gradeNum + numRaw.padStart(2, '0') : numRaw.padStart(2, '0');
+                    name = nameStr.replace(/^\d+\s*/, '').trim();
                 } else { fallbackId++; }
                 if (name === "") name = nameStr;
 

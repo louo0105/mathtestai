@@ -52,6 +52,15 @@ def process_ods():
         if pd.isna(raw_name) or raw_name == 'nan' or raw_name.strip() == '':
             continue
 
+        # 偵測年級 (從檔名或 raw_name)
+        grade_prefix = "5"
+        if "3" in ods_path or "三年" in raw_name or "3年" in raw_name:
+            grade_prefix = "3"
+        elif "4" in ods_path or "四年" in raw_name or "4年" in raw_name:
+            grade_prefix = "4"
+        elif "6" in ods_path or "六年" in raw_name or "6年" in raw_name:
+            grade_prefix = "6"
+
         # 嘗試從姓名提取號碼。
         # 很多時候格式是 "5年 2組 2號 姓名"，我們想要的是最後一個數字（座號）
         nums = re.findall(r'(\d+)', raw_name)
@@ -59,11 +68,11 @@ def process_ods():
             # 取最後一個數字作為座號
             num = int(nums[-1])
             if num < 100:
-                student_id = f"5{num:02d}" # 例如 2號 -> 502
+                student_id = f"{grade_prefix}{num:02d}" # 例如 2號 -> 502 or 302
             else:
                 student_id = str(num)
         else:
-            student_id = str(501 + (i - 2))
+            student_id = f"{grade_prefix}{501 + (i - 2):02d}"
 
         # 移除前綴保留純姓名
         clean_name = raw_name.split(' ')[-1] if ' ' in raw_name else raw_name
