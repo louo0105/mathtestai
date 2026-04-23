@@ -24,10 +24,10 @@ def find_latest_ods():
     ods_files.sort(key=os.path.getmtime, reverse=True)
     return ods_files[0]
 
-def process_ods():
-    ods_path = find_latest_ods()
+def process_ods(specific_file=None):
+    ods_path = specific_file or find_latest_ods()
     if not ods_path:
-        print("[Error] No .ods files found in current directory.")
+        print("[Error] No .ods files found.")
         return None
 
     print(f"Reading ODS file: {ods_path}...")
@@ -143,8 +143,8 @@ def check_node_coverage(ods_nodes):
         if not has_extra:
             missing_nodes.append(node)
 
-def run_ods_sync():
-    data, node_cols = process_ods()
+def run_ods_sync(specific_file=None):
+    data, node_cols = process_ods(specific_file)
     if data:
         success = sync_to_supabase(data)
         # 收集 ODS 標題中所有的知識點 (而不只是弱點)
