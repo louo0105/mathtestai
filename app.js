@@ -738,51 +738,23 @@ function handleOdsUpload(file) {
                 } else { fallbackId++; }
                 if (name === "") name = nameStr;
 
-                // 4. 第三階段：核心弱點判定 (只要答對率不是 100，或有「未通過」)
+                // 4. 第三階段：核心弱點判定 (嚴格遵守：只看「答對率」那一欄，即區塊最後一欄)
                 const weakNodes = [];
                 for (let code in nodeGroups) {
                     const cols = nodeGroups[code];
-                    let isWeak = false;
+                    if (cols.length === 0) continue;
 
-                    // A. 掃描整個區塊是否有「未通過」或「為 0」
-                    for (let cIdx of cols) {
-                        let val = String(row[cIdx] !== undefined ? row[cIdx] : "").trim();
-                        if (val.includes('未通過')) {
-                            isWeak = true;
-                            break;
-                        }
-                        // 若檔案內容是數字分數 (0 或 1)，只要有 0 就視為弱點
-                        if (val !== "" && val !== "-") {
-                            let fVal = parseFloat(val);
-                            if (!isNaN(fVal) && fVal === 0) {
-                                isWeak = true;
-                                break;
-                            }
+                    // 取得該節點區塊的最後一欄（即答對率）
+                    const rateColIdx = cols[cols.length - 1];
+                    let val = String(row[rateColIdx] !== undefined ? row[rateColIdx] : "").trim();
+
+                    if (val !== "" && val !== "-") {
+                        let fVal = parseFloat(val);
+                        // 只要答對率低於 100 就算弱點
+                        if (!isNaN(fVal) && fVal < 100) {
+                            weakNodes.push(code);
                         }
                     }
-
-                    // B. 如果還沒被判為弱點，且存在「答對率」欄位，才進行百分比檢查
-                    if (!isWeak) {
-                        let rateCols = cols.filter(cIdx => 
-                            String(headerRow2[cIdx] || "").includes('率') || 
-                            String(headerRow1[cIdx] || "").includes('率') ||
-                            String(headerRow0[cIdx] || "").includes('率')
-                        );
-                        
-                        if (rateCols.length > 0) {
-                            let summaryColIdx = Math.max(...rateCols);
-                            let rateVal = String(row[summaryColIdx] !== undefined ? row[summaryColIdx] : "").trim();
-                            if (rateVal !== "" && rateVal !== "-") {
-                                let num = parseFloat(rateVal.replace('%', ''));
-                                // 只要有效數字且小於 100，視為弱點
-                                if (!isNaN(num) && num < 100) {
-                                    isWeak = true;
-                                }
-                            }
-                        }
-                    }
-
-                    if (isWeak) weakNodes.push(code);
                 }
 
                 newMapping[id] = {

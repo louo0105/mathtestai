@@ -77,16 +77,24 @@ def process_ods(specific_file=None):
         # 移除前綴保留純姓名
         clean_name = raw_name.split(' ')[-1] if ' ' in raw_name else raw_name
 
-        # 尋找弱點 (得分為 0 的節點)
+        # 尋找弱點 (只看「答對率」那一欄，通常在知識點代碼欄位向右偏移 8 格)
         weak_nodes = []
-        for col in node_cols:
-            val = row[col]
-            try:
-                if float(val) == 0:
-                    node_code = re.match(r'([A-Z]-\d+-\d+(-\w+)?)', str(col)).group(1)
-                    weak_nodes.append(node_code)
-            except:
-                pass
+        for col_idx in range(len(df.columns)):
+            col_name = str(df.columns[col_idx])
+            # 找到知識點代碼欄位
+            m = re.match(r'([A-Z]-\d+-\d+(-\w+)?)', col_name)
+            if m:
+                node_code = m.group(1)
+                # 向右偏移 8 格找到「答對率」
+                rate_col_idx = col_idx + 8
+                if rate_col_idx < len(df.columns):
+                    try:
+                        rate_val = row.iloc[rate_col_idx]
+                        # 只看答對率，低於 100 分視為弱點
+                        if float(rate_val) < 100:
+                            weak_nodes.append(node_code)
+                    except:
+                        pass
 
         students_data.append({
             "id": student_id,
