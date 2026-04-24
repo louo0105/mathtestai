@@ -170,7 +170,7 @@ const DatabaseService = {
         
         if (error) {
             console.error('同步學生名單失敗:', error);
-            alert('雲端同步失敗！請確認 Supabase 的 CORS 設定包含 http://localhost:8080\n錯誤訊息: ' + error.message);
+            alert(`雲端同步失敗！請確認 Supabase 的 CORS 設定是否允許當前網域 (${window.location.origin})\n錯誤訊息: ` + error.message);
         } else {
             console.log('雲端名單同步成功');
             alert('✅ 雲端名單與進度已成功初始化！');
