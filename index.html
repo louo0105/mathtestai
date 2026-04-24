@@ -130,6 +130,24 @@
                         </div>
                     </div>
                     <div id="upload-status" class="status-msg"></div>
+                    <!-- 新增：全班弱點統計報表容器 -->
+                    <div id="weakness-report-container" class="weakness-report-container hidden" style="margin-top: 20px;">
+                        <h3>📊 全班弱點統計分析</h3>
+                        <p class="section-desc">以下節點為全班錯誤率最高(即最多人設為弱點)的知識點，建議可於課堂優先加強：</p>
+                        <div class="table-wrapper">
+                            <table class="report-table">
+                                <thead>
+                                    <tr>
+                                        <th>排名</th>
+                                        <th>知識點代碼</th>
+                                        <th>知識點描述</th>
+                                        <th>弱點人數</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="weakness-report-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </section>
 
                 <section class="teacher-section card glass">
@@ -153,8 +171,11 @@
                 <section class="teacher-section card glass">
                     <div class="section-header">
                         <h2>學生練習進度總覽</h2>
-                        <span class="section-desc">統計每位學生在目前所有弱點節點的完成狀況。</span>
+                        <div class="header-actions">
+                            <button id="export-summary-btn" class="btn-outline">📥 匯出進度 (CSV)</button>
+                        </div>
                     </div>
+                    <span class="section-desc">統計每位學生在目前所有弱點節點的完成狀況。</span>
                     <div class="table-wrapper">
                         <table class="report-table">
                             <thead>
@@ -176,6 +197,7 @@
                     <div class="section-header">
                         <h2>學生練習活動紀錄</h2>
                         <div class="header-actions">
+                            <button id="export-records-btn" class="btn-outline">📥 匯出紀錄 (CSV)</button>
                             <button id="clear-records-btn" class="btn-danger">清空所有紀錄</button>
                         </div>
                     </div>
