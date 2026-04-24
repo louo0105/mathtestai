@@ -129,7 +129,6 @@ function setupEventListeners() {
     document.getElementById('clear-records-btn').addEventListener('click', clearRecords);
     
     // 新增匯出按鈕監聽
-    document.getElementById('export-summary-btn').addEventListener('click', exportSummaryToCSV);
     document.getElementById('export-records-btn').addEventListener('click', exportRecordsToCSV);
 
     // ODS 上傳處理
@@ -685,8 +684,8 @@ function handleOdsUpload(file) {
                         nodeStartIndices.push({ code: code, start: j });
                         // 紀錄描述
                         const desc = cell0.split(' ').slice(1).join(' ').trim() || code;
-                        if (typeof window.NODES_DESCRIPTIONS !== 'undefined') {
-                             window.NODES_DESCRIPTIONS[code] = desc;
+                        if (typeof NODES_DESCRIPTIONS !== 'undefined') {
+                             NODES_DESCRIPTIONS[code] = desc;
                         }
                     }
                 }
@@ -898,9 +897,9 @@ function generateWeaknessReportFromCloud(cloudStudents) {
     if (sortedNodes.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">全班皆無弱點紀錄！</td></tr>';
     } else {
-        const topNodes = sortedNodes.slice(0, 15);
+        const topNodes = sortedNodes.slice(0, 10);
         topNodes.forEach((item, index) => {
-            const desc = window.NODES_DESCRIPTIONS && window.NODES_DESCRIPTIONS[item.code] ? window.NODES_DESCRIPTIONS[item.code] : '未知知識點';
+            const desc = (typeof NODES_DESCRIPTIONS !== 'undefined' && NODES_DESCRIPTIONS[item.code]) ? NODES_DESCRIPTIONS[item.code] : '未知知識點';
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td><span class="badge" style="background:${index < 3 ? '#ff3b30' : '#8e8e93'}">${index + 1}</span></td>
@@ -959,46 +958,6 @@ function clearRecords() {
     }
 }
 
-// 匯出進度總覽 CSV
-async function exportSummaryToCSV() {
-    let [cloudStudents, allCloudProgress] = await Promise.all([
-        DatabaseService.getAllStudents(currentTeacherId).catch(() => []),
-        DatabaseService.getAllProgress(currentTeacherId).catch(() => [])
-    ]);
-
-    if (!cloudStudents || cloudStudents.length === 0) {
-        alert("無資料可匯出！");
-        return;
-    }
-
-    let csvContent = "學號,姓名,總弱點數,已完成(初級),已完成(中級),已完成(高級),完成率\n";
-
-    cloudStudents.sort((a, b) => parseInt(a.id) - parseInt(b.id)).forEach(student => {
-        const studentWeakNodes = [...new Set(student.weak_nodes || [])];
-        const totalPossible = studentWeakNodes.length;
-
-        const pList = allCloudProgress.filter(p => String(p.student_id) === String(student.id));
-        const progress = pList.reduce((acc, cur) => {
-            acc[`${cur.node_code}_${cur.level}`] = cur.is_completed;
-            return acc;
-        }, {});
-
-        let bCount = 0, iCount = 0, aCount = 0;
-        studentWeakNodes.forEach(node => {
-            if (progress[`${node}_beginner`]) bCount++;
-            if (progress[`${node}_intermediate`]) iCount++;
-            if (progress[`${node}_advanced`]) aCount++;
-        });
-
-        const totalTasks = totalPossible * 3;
-        const percent = totalTasks > 0 ? Math.round(((bCount + iCount + aCount) / totalTasks) * 100) : 0;
-
-        csvContent += `${student.id},${student.name},${totalPossible},${bCount},${iCount},${aCount},${percent}%\n`;
-    });
-
-    downloadCSV(csvContent, '學生進度總覽.csv');
-}
-
 // 匯出活動紀錄 CSV
 async function exportRecordsToCSV() {
     const records = await DatabaseService.getAllLogs(currentTeacherId);
@@ -1011,7 +970,7 @@ async function exportRecordsToCSV() {
 
     records.forEach(r => {
         const levelName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[r.level];
-        const nodeTitle = window.NODES_DESCRIPTIONS && window.NODES_DESCRIPTIONS[r.node_code] ? window.NODES_DESCRIPTIONS[r.node_code] : r.node_code;
+        const nodeTitle = (typeof NODES_DESCRIPTIONS !== 'undefined' && NODES_DESCRIPTIONS[r.node_code]) ? NODES_DESCRIPTIONS[r.node_code] : r.node_code;
         // 處理 CSV 欄位中可能包含逗號的情況
         const safeTitle = `"${nodeTitle.replace(/"/g, '""')}"`;
         csvContent += `${r.student_id},${r.name},${r.node_code},${safeTitle},${levelName},${r.accuracy},${formatDuration(r.duration)},${new Date(r.created_at).toLocaleString()}\n`;
