@@ -979,21 +979,21 @@ async function exportSummaryToCSV() {
 
         const pList = allCloudProgress.filter(p => String(p.student_id) === String(student.id));
         const progress = pList.reduce((acc, cur) => {
-            acc[\`\${cur.node_code}_\${cur.level}\`] = cur.is_completed;
+            acc[`${cur.node_code}_${cur.level}`] = cur.is_completed;
             return acc;
         }, {});
 
         let bCount = 0, iCount = 0, aCount = 0;
         studentWeakNodes.forEach(node => {
-            if (progress[\`\${node}_beginner\`]) bCount++;
-            if (progress[\`\${node}_intermediate\`]) iCount++;
-            if (progress[\`\${node}_advanced\`]) aCount++;
+            if (progress[`${node}_beginner`]) bCount++;
+            if (progress[`${node}_intermediate`]) iCount++;
+            if (progress[`${node}_advanced`]) aCount++;
         });
 
         const totalTasks = totalPossible * 3;
         const percent = totalTasks > 0 ? Math.round(((bCount + iCount + aCount) / totalTasks) * 100) : 0;
 
-        csvContent += \`\${student.id},\${student.name},\${totalPossible},\${bCount},\${iCount},\${aCount},\${percent}%\n\`;
+        csvContent += `${student.id},${student.name},${totalPossible},${bCount},${iCount},${aCount},${percent}%\n`;
     });
 
     downloadCSV(csvContent, '學生進度總覽.csv');
@@ -1013,8 +1013,8 @@ async function exportRecordsToCSV() {
         const levelName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[r.level];
         const nodeTitle = window.NODES_DESCRIPTIONS && window.NODES_DESCRIPTIONS[r.node_code] ? window.NODES_DESCRIPTIONS[r.node_code] : r.node_code;
         // 處理 CSV 欄位中可能包含逗號的情況
-        const safeTitle = \`"\${nodeTitle.replace(/"/g, '""')}"\`;
-        csvContent += \`\${r.student_id},\${r.name},\${r.node_code},\${safeTitle},\${levelName},\${r.accuracy},\${formatDuration(r.duration)},\${new Date(r.created_at).toLocaleString()}\n\`;
+        const safeTitle = `"${nodeTitle.replace(/"/g, '""')}"`;
+        csvContent += `${r.student_id},${r.name},${r.node_code},${safeTitle},${levelName},${r.accuracy},${formatDuration(r.duration)},${new Date(r.created_at).toLocaleString()}\n`;
     });
 
     downloadCSV(csvContent, '學生練習活動紀錄.csv');
