@@ -127,6 +127,10 @@ function setupEventListeners() {
     document.getElementById('refresh-btn').addEventListener('click', renderTeacherDashboard);
     document.getElementById('student-search').addEventListener('input', renderTeacherDashboard);
     document.getElementById('clear-records-btn').addEventListener('click', clearRecords);
+    
+    // 新增匯出按鈕監聽
+    document.getElementById('export-summary-btn').addEventListener('click', exportSummaryToCSV);
+    document.getElementById('export-records-btn').addEventListener('click', exportRecordsToCSV);
 
     // ODS 上傳處理
     const odsInput = document.getElementById('ods-input');
@@ -860,6 +864,55 @@ async function renderProgressOverview() {
         `;
         tbody.appendChild(tr);
     });
+
+    // 動態產生全班弱點統計報表
+    generateWeaknessReportFromCloud(cloudStudents);
+}
+
+// 從雲端名單產生弱點報表
+function generateWeaknessReportFromCloud(cloudStudents) {
+    const reportContainer = document.getElementById('weakness-report-container');
+    const tbody = document.getElementById('weakness-report-tbody');
+    
+    if (!cloudStudents || cloudStudents.length === 0) {
+        reportContainer.classList.add('hidden');
+        return;
+    }
+
+    const nodeCounts = {};
+    cloudStudents.forEach(student => {
+        const weakNodes = [...new Set(student.weak_nodes || [])];
+        weakNodes.forEach(node => {
+            nodeCounts[node] = (nodeCounts[node] || 0) + 1;
+        });
+    });
+
+    // 轉換為陣列並排序 (由多到少)
+    const sortedNodes = Object.keys(nodeCounts).map(node => ({
+        code: node,
+        count: nodeCounts[node]
+    })).sort((a, b) => b.count - a.count);
+
+    tbody.innerHTML = '';
+    
+    if (sortedNodes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">全班皆無弱點紀錄！</td></tr>';
+    } else {
+        const topNodes = sortedNodes.slice(0, 15);
+        topNodes.forEach((item, index) => {
+            const desc = window.NODES_DESCRIPTIONS && window.NODES_DESCRIPTIONS[item.code] ? window.NODES_DESCRIPTIONS[item.code] : '未知知識點';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><span class="badge" style="background:${index < 3 ? '#ff3b30' : '#8e8e93'}">${index + 1}</span></td>
+                <td><span class="node-code">${item.code}</span></td>
+                <td>${desc}</td>
+                <td><strong style="color:#ff3b30">${item.count} 人</strong></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+    
+    reportContainer.classList.remove('hidden');
 }
 
 async function renderActivityLog() {
@@ -904,6 +957,81 @@ function clearRecords() {
             renderTeacherDashboard();
         });
     }
+}
+
+// 匯出進度總覽 CSV
+async function exportSummaryToCSV() {
+    let [cloudStudents, allCloudProgress] = await Promise.all([
+        DatabaseService.getAllStudents(currentTeacherId).catch(() => []),
+        DatabaseService.getAllProgress(currentTeacherId).catch(() => [])
+    ]);
+
+    if (!cloudStudents || cloudStudents.length === 0) {
+        alert("無資料可匯出！");
+        return;
+    }
+
+    let csvContent = "學號,姓名,總弱點數,已完成(初級),已完成(中級),已完成(高級),完成率\n";
+
+    cloudStudents.sort((a, b) => parseInt(a.id) - parseInt(b.id)).forEach(student => {
+        const studentWeakNodes = [...new Set(student.weak_nodes || [])];
+        const totalPossible = studentWeakNodes.length;
+
+        const pList = allCloudProgress.filter(p => String(p.student_id) === String(student.id));
+        const progress = pList.reduce((acc, cur) => {
+            acc[\`\${cur.node_code}_\${cur.level}\`] = cur.is_completed;
+            return acc;
+        }, {});
+
+        let bCount = 0, iCount = 0, aCount = 0;
+        studentWeakNodes.forEach(node => {
+            if (progress[\`\${node}_beginner\`]) bCount++;
+            if (progress[\`\${node}_intermediate\`]) iCount++;
+            if (progress[\`\${node}_advanced\`]) aCount++;
+        });
+
+        const totalTasks = totalPossible * 3;
+        const percent = totalTasks > 0 ? Math.round(((bCount + iCount + aCount) / totalTasks) * 100) : 0;
+
+        csvContent += \`\${student.id},\${student.name},\${totalPossible},\${bCount},\${iCount},\${aCount},\${percent}%\n\`;
+    });
+
+    downloadCSV(csvContent, '學生進度總覽.csv');
+}
+
+// 匯出活動紀錄 CSV
+async function exportRecordsToCSV() {
+    const records = await DatabaseService.getAllLogs(currentTeacherId);
+    if (!records || records.length === 0) {
+        alert("無資料可匯出！");
+        return;
+    }
+
+    let csvContent = "學號,姓名,練習項目代碼,練習項目名稱,難度,正確率,耗時,最後練習時間\n";
+
+    records.forEach(r => {
+        const levelName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[r.level];
+        const nodeTitle = window.NODES_DESCRIPTIONS && window.NODES_DESCRIPTIONS[r.node_code] ? window.NODES_DESCRIPTIONS[r.node_code] : r.node_code;
+        // 處理 CSV 欄位中可能包含逗號的情況
+        const safeTitle = \`"\${nodeTitle.replace(/"/g, '""')}"\`;
+        csvContent += \`\${r.student_id},\${r.name},\${r.node_code},\${safeTitle},\${levelName},\${r.accuracy},\${formatDuration(r.duration)},\${new Date(r.created_at).toLocaleString()}\n\`;
+    });
+
+    downloadCSV(csvContent, '學生練習活動紀錄.csv');
+}
+
+function downloadCSV(csvContent, filename) {
+    // 加上 BOM 讓 Excel 識別為 UTF-8
+    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+    const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 function formatDuration(sec) {
