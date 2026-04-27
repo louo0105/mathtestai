@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 考古題 - 題庫管理與稽核中心</title>
+    <style>
+        :root {
+            --primary: #007AFF;
+            --success: #34C759;
+            --danger: #FF3B30;
+            --warning: #FF9500;
+            --bg: #F2F2F7;
+            --card: #FFFFFF;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            color: #1C1C1E;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        h1 { margin: 0; font-size: 24px; color: var(--primary); }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        .stat-value { font-size: 32px; font-weight: bold; margin-bottom: 4px; }
+        .stat-label { font-size: 14px; color: #8E8E93; }
+
+        .search-bar {
+            background: var(--card);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        input {
+            flex: 1;
+            padding: 10px 16px;
+            border: 1px solid #C7C7CC;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .filter-btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            background: #E5E5EA;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .filter-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        th {
+            background: #F8F8F8;
+            padding: 14px;
+            text-align: left;
+            font-size: 14px;
+            color: #8E8E93;
+            border-bottom: 1px solid #E5E5EA;
+        }
+
+        td {
+            padding: 14px;
+            border-bottom: 1px solid #F2F2F7;
+            font-size: 15px;
+        }
+
+        .status-pill {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-danger { background: #FFE5E5; color: var(--danger); }
+        .status-success { background: #E5FFE5; color: var(--success); }
+        .status-warn { background: #FFF5E5; color: var(--warning); }
+
+        .node-code { font-family: monospace; font-weight: bold; color: #5856D6; }
+        
+        .counts { display: flex; gap: 8px; }
+        .count-badge {
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #F2F2F7;
+        }
+
+        .btn-update {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .instruction-card {
+            background: #E8F2FF;
+            padding: 16px;
+            border-radius: 12px;
+            margin-top: 24px;
+            font-size: 14px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .hidden { display: none; }
+
+        /* ODS Audit Styles */
+        .audit-card {
+            background: linear-gradient(135deg, #007AFF 0%, #5856D6 100%);
+            color: white;
+            padding: 24px;
+            border-radius: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            box-shadow: 0 8px 24px rgba(0,122,255,0.2);
+        }
+
+        .audit-info { flex: 1; }
+        .audit-info h2 { margin: 0 0 8px 0; font-size: 20px; }
+        .audit-info p { margin: 0; opacity: 0.9; font-size: 14px; }
+
+        .drop-zone {
+            width: 300px;
+            height: 120px;
+            border: 2px dashed rgba(255,255,255,0.4);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .drop-zone:hover, .drop-zone.dragover {
+            background: rgba(255,255,255,0.2);
+            border-color: #fff;
+        }
+
+        .drop-zone span { font-size: 13px; font-weight: 500; }
+        .drop-zone small { font-size: 11px; opacity: 0.7; margin-top: 4px; }
+
+        .report-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 2000;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .report-content {
+            background: white; width: 90%; max-width: 800px; max-height: 85vh;
+            border-radius: 20px; overflow-y: auto; padding: 32px;
+            position: relative;
+        }
+
+        .report-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+        .report-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+        .report-stat { background: #F2F2F7; padding: 16px; border-radius: 12px; text-align: center; }
+        .report-list { border: 1px solid #E5E5EA; border-radius: 12px; overflow: hidden; }
+        .report-item { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #F2F2F7; }
+        .report-item:last-child { border-bottom: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>💎 題庫稽核與管理中心</h1>
+        <div style="text-align: right;">
+            <div id="last-refresh-time" style="font-size: 12px; color: #8E8E93; margin-bottom: 4px;">載入中...</div>
+            <button class="btn-update" style="background: var(--success);" onclick="showRefreshModal('patch')">✨ 缺題補足</button>
+            <button class="btn-update" style="background: var(--danger);" onclick="showRefreshModal('full')">🚨 全面翻新</button>
+        </div>
+    </header>
+
+    <!-- ODS 檔案稽核區 -->
+    <section class="audit-card">
+        <div class="audit-info">
+            <h2>🔍 ODS 檔案快速稽核</h2>
+            <p>上傳學生評量報告 (ODS)，立即檢查該檔案要求的知識點是否已有足夠題目。</p>
+        </div>
+        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('ods-upload').click()">
+            <span id="drop-text">📄 點擊或拖曳 ODS 檔案</span>
+            <small>支援由測驗系統匯出的 .ods 格式</small>
+            <input type="file" id="ods-upload" class="hidden" accept=".ods">
+        </div>
+    </section>
+
+    <!-- ODS 稽核報告彈窗 -->
+    <div id="report-modal" class="report-modal hidden">
+        <div class="report-content">
+            <div class="report-header">
+                <div>
+                    <h2 style="margin: 0; color: var(--primary);">📊 ODS 需求稽核報告</h2>
+                    <p id="report-file-name" style="margin: 4px 0 0 0; color: #8E8E93; font-size: 14px;"></p>
+                </div>
+                <button onclick="closeReport()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #8E8E93;">&times;</button>
+            </div>
+
+            <div class="report-grid">
+                <div class="report-stat">
+                    <div class="stat-value" id="ods-total-nodes">0</div>
+                    <div class="stat-label">此檔案內含知識點</div>
+                </div>
+                <div class="report-stat">
+                    <div class="stat-value" id="ods-covered-nodes" style="color: var(--success);">0</div>
+                    <div class="stat-label">已覆蓋知識點</div>
+                </div>
+                <div class="report-stat">
+                    <div class="stat-value" id="ods-missing-nodes" style="color: var(--danger);">0</div>
+                    <div class="stat-label">缺失知識點</div>
+                </div>
+            </div>
+
+            <h3 style="font-size: 16px; margin-bottom: 12px;">缺失知識點清單：</h3>
+            <div class="report-list" id="ods-missing-list">
+                <!-- 動態插入 -->
+            </div>
+
+            <div id="ods-patch-instruction" class="instruction-card hidden" style="margin-top: 24px;">
+                <strong>🛠 補齊建議：</strong><br>
+                請在終端機執行下方指令來補齊此檔案缺失的題目：<br>
+                <code id="ods-patch-cmd" style="background:#000; color:#0f0; padding:8px; display:block; border-radius:6px; margin-top:8px; font-family:monospace; font-size:12px;">python refresh_bank.py --patch</code>
+            </div>
+
+            <button onclick="closeReport()" style="width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; margin-top: 24px;">關閉報告</button>
+        </div>
+    </div>
+
+    <!-- 翻新指令彈窗 -->
+    <!-- 翻新指令彈窗 -->
+    <div id="refresh-modal" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:white; padding:30px; border-radius:16px; max-width:550px; width:95%; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+            <h2 id="modal-title" style="margin-top:0; color: var(--primary);">題庫更新指引</h2>
+            <div id="modal-desc">
+                <p>請根據您的需求選擇更新方式：</p>
+            </div>
+            <div id="grade-select-container" style="margin-bottom: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+                <label for="update-grade" style="font-size: 14px; color: #1c1c1e; font-weight: bold;">🎯 目標年級：</label>
+                <select id="update-grade" onchange="updateCommandDisplay()" style="padding: 8px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; margin-left: 8px;">
+                    <option value="all">當前選取 (全部)</option>
+                    <option value="3">僅三年級</option>
+                    <option value="4">僅四年級</option>
+                    <option value="5">僅五年級</option>
+                    <option value="6">僅六年級</option>
+                </select>
+            </div>
+            <div style="background:#F2F2F7; padding:15px; border-radius:12px; margin-bottom:20px;">
+                <p style="margin-top:0; font-weight:bold;">執行步驟：</p>
+                <ol style="padding-left:20px; font-size:14px;">
+                    <li>開啟終端機 (PowerShell / CMD)</li>
+                    <li>切換至專案目錄</li>
+                    <li>複製並執行下方指令：</li>
+                </ol>
+                <code id="command-box" style="background:#000; color:#0f0; padding:12px; display:block; border-radius:8px; font-family:monospace; word-break:break-all; font-size:13px; margin-top:10px;">python refresh_bank.py</code>
+            </div>
+            <p style="font-size:12px; color:#8E8E93;">⚠️ 注意：全量翻新可能需要 15-30 分鐘，缺題補足則視缺題數量而定。</p>
+            <button onclick="hideRefreshModal()" style="width:100%; padding:14px; background:var(--primary); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:16px;">我了解了</button>
+        </div>
+    </div>
+
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" id="total-nodes">0</div>
+            <div class="stat-label">總知識點數</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="coverage-pct" style="color: var(--success);">0%</div>
+            <div class="stat-label">題庫覆蓋率</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="missing-count" style="color: var(--danger);">0</div>
+            <div class="stat-label">缺題知識點</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="total-qs">0</div>
+            <div class="stat-label">累積題目總數</div>
+        </div>
+    </div>
+
+    <div class="search-bar" style="flex-wrap: wrap;">
+        <div style="display: flex; gap: 12px; align-items: center; flex: 1; min-width: 300px;">
+            <input type="text" id="node-search" placeholder="搜尋代碼或關鍵字..." oninput="renderAuditTable()">
+        </div>
+        <div style="display: flex; gap: 8px; margin-left: auto;">
+            <button class="filter-btn active" id="filter-all" onclick="setFilter('all')">全部</button>
+            <button class="filter-btn" id="filter-missing" onclick="setFilter('missing')">缺題</button>
+            <button class="filter-btn" id="filter-low" onclick="setFilter('low')">低題數</button>
+            <button class="filter-btn" id="filter-placeholder" onclick="setFilter('placeholder')">🕵️ 抓出空殼題</button>
+        </div>
+        <div style="width: 100%; height: 1px; background: #eee; margin: 10px 0;"></div>
+        <div style="display: flex; gap: 8px; width: 100%;">
+            <span style="font-size: 14px; color: #8E8E93; align-self: center;">年級篩選：</span>
+            <button class="filter-btn active" id="grade-all" onclick="setGradeFilter('all')">全部</button>
+            <button class="filter-btn" id="grade-3" onclick="setGradeFilter('3')">三年級</button>
+            <button class="filter-btn" id="grade-4" onclick="setGradeFilter('4')">四年級</button>
+            <button class="filter-btn" id="grade-5" onclick="setGradeFilter('5')">五年級</button>
+            <button class="filter-btn" id="grade-6" onclick="setGradeFilter('6')">六年級</button>
+        </div>
+    </div>
+
+    <table id="audit-table">
+        <thead>
+            <tr>
+                <th>狀態</th>
+                <th>知識點代碼</th>
+                <th>內容描述</th>
+                <th>題數 (初/中/高/素養)</th>
+            </tr>
+        </thead>
+        <tbody id="audit-tbody">
+            <!-- 動態插入 -->
+        </tbody>
+    </table>
+
+    <div class="instruction-card">
+        <strong>💡 操作提示：</strong><br>
+        如果您發現缺題，請執行本地腳本 <code>python build_extra_data.py</code> 來自動生成題目，或是透過系統的 <strong>AI 模式</strong> 進行即時生成。
+        重新生成題目後，點擊上方的「重新整理資料」即可看到最新結果。
+    </div>
+</div>
+
+<!-- 載入資料 -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="data.js"></script>
+<script src="extra_data.js"></script>
+
+<script>
+    let currentFilter = 'all';
+    let currentGrade = 'all';
+    let auditData = [];
+    let currentMode = 'patch'; // 'full' or 'patch'
+
+    function initAudit() {
+        // 讀取生成時間
+        const timeBadge = document.getElementById('last-refresh-time');
+        if (typeof EXTRA_DATA_UPDATE_TIME !== 'undefined') {
+            timeBadge.innerHTML = `📅 本地題庫最後更新：${EXTRA_DATA_UPDATE_TIME}`; 
+        } else {
+            timeBadge.innerHTML = `📅 本地題庫最後更新：尚未進行全量更新`;
+        }
+
+        // 模擬 app.js 的合併邏輯
+        const masterBank = JSON.parse(JSON.stringify(QUESTION_BANK));
+        
+        if (typeof EXTRA_QUESTION_BANK !== 'undefined') {
+            for (const node in EXTRA_QUESTION_BANK) {
+                const cleanNode = node.trim().toUpperCase();
+                if (!masterBank[cleanNode]) masterBank[cleanNode] = { beginner: [], intermediate: [], advanced: [], literacy: [] };
+                
+                for (const level in EXTRA_QUESTION_BANK[node]) {
+                    if (!masterBank[cleanNode][level]) masterBank[cleanNode][level] = [];
+                    masterBank[cleanNode][level] = masterBank[cleanNode][level].concat(EXTRA_QUESTION_BANK[node][level]);
+                }
+            }
+        }
+
+        // 進行稽核
+        auditData = Object.keys(NODES_DESCRIPTIONS).map(code => {
+            const bank = masterBank[code] || { beginner: [], intermediate: [], advanced: [], literacy: [] };
+            
+            // 過濾佔位符題目 (vs app.js mergeExtraQuestions)
+            const filterPlaceholders = (qs) => (qs || []).filter(q => {
+                const isFake1 = (q.options || []).some(opt => opt.includes('錯誤值') || opt.includes('正確結果'));
+                const isFake2 = q.exp && q.exp.includes('基礎題型');
+                const isFake3 = (q.options || []).some(opt => opt.includes('此為正確的觀念描述') || opt.includes('該觀念的錯誤誤解') || opt.includes('完全不相干的描述'));
+                return !isFake1 && !isFake2 && !isFake3;
+            });
+
+            const rawB = (bank.beginner || []).length;
+            const rawI = (bank.intermediate || []).length;
+            const rawA = (bank.advanced || []).length;
+            const rawL = (bank.literacy || []).length;
+            const rawTotal = rawB + rawI + rawA + rawL;
+
+            const b = filterPlaceholders(bank.beginner).length;
+            const i = filterPlaceholders(bank.intermediate).length;
+            const a = filterPlaceholders(bank.advanced).length;
+            const l = filterPlaceholders(bank.literacy).length;
+            const total = b + i + a + l;
+            
+            const hasPlaceholder = (rawTotal > total);
+
+            return {
+                code,
+                desc: NODES_DESCRIPTIONS[code],
+                b, i, a, l, total,
+                hasPlaceholder
+            };
+        });
+
+        updateStats();
+        renderAuditTable();
+    }
+
+    function updateStats() {
+        const total = auditData.length;
+        const covered = auditData.filter(d => d.total > 0).length;
+        const missing = total - covered;
+        const totalQs = auditData.reduce((sum, d) => sum + d.total, 0);
+
+        document.getElementById('total-nodes').textContent = total;
+        document.getElementById('coverage-pct').textContent = Math.round((covered / total) * 100) + '%';
+        document.getElementById('missing-count').textContent = missing;
+        document.getElementById('total-qs').textContent = totalQs;
+    }
+
+    function setFilter(filter) {
+        currentFilter = filter;
+        document.querySelectorAll('.filter-btn[id^="filter-"]').forEach(b => b.classList.remove('active'));
+        document.getElementById(`filter-${filter}`).classList.add('active');
+        renderAuditTable();
+    }
+
+    function setGradeFilter(grade) {
+        currentGrade = grade;
+        document.querySelectorAll('.filter-btn[id^="grade-"]').forEach(b => b.classList.remove('active'));
+        document.getElementById(`grade-${grade}`).classList.add('active');
+        renderAuditTable();
+    }
+
+    function renderAuditTable() {
+        const tbody = document.getElementById('audit-tbody');
+        const search = document.getElementById('node-search').value.toLowerCase();
+        tbody.innerHTML = '';
+
+        let filtered = auditData;
+
+        // 關鍵字過濾
+        if (search) {
+            filtered = filtered.filter(d => d.code.toLowerCase().includes(search) || d.desc.toLowerCase().includes(search));
+        }
+
+        // 年級過濾
+        if (currentGrade !== 'all') {
+            filtered = filtered.filter(d => d.code.includes(`-${currentGrade}-`));
+        }
+
+        // 狀態過濾
+        if (currentFilter === 'missing') {
+            filtered = filtered.filter(d => d.total === 0);
+        } else if (currentFilter === 'low') {
+            filtered = filtered.filter(d => d.total > 0 && d.total < 3);
+        } else if (currentFilter === 'placeholder') {
+            filtered = filtered.filter(d => d.hasPlaceholder);
+        }
+
+        // 排序：缺題優先
+        filtered.sort((a, b) => a.total - b.total);
+
+        filtered.forEach(d => {
+            const tr = document.createElement('tr');
+            
+            let statusHtml = '';
+            if (d.hasPlaceholder) {
+                statusHtml = '<span class="status-pill" style="background: #E5E0FF; color: #5856D6;">🪹 混入空殼</span>';
+            } else if (d.total === 0) {
+                statusHtml = '<span class="status-pill status-danger">❌ 缺題</span>';
+            } else if (d.total < 3) {
+                statusHtml = '<span class="status-pill status-warn">⚠️ 低量</span>';
+            } else {
+                statusHtml = '<span class="status-pill status-success">✅ 充足</span>';
+            }
+
+            tr.innerHTML = `
+                <td>${statusHtml}</td>
+                <td class="node-code">${d.code}</td>
+                <td>${d.desc}</td>
+                <td>
+                    <div class="counts">
+                        <span class="count-badge">${d.b}</span>
+                        <span class="count-badge">${d.i}</span>
+                        <span class="count-badge">${d.a}</span>
+                        <span class="count-badge" style="background:#FFE5E5; color:var(--danger);">${d.l}</span>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function showRefreshModal(mode) {
+        currentMode = mode;
+        const modal = document.getElementById('refresh-modal');
+        const title = document.getElementById('modal-title');
+        const desc = document.getElementById('modal-desc');
+        const gradeSelect = document.getElementById('update-grade');
+
+        // 同步當前的篩選年級到選單
+        gradeSelect.value = currentGrade;
+
+        if (mode === 'full') {
+            title.textContent = "🚨 全面翻新題庫";
+            title.style.color = "var(--danger)";
+            desc.innerHTML = "<p>此操作將會<b>清空</b>現存之擴充題庫，並讓 AI 重新生成題目。適用於大換血。</p>";
+        } else {
+            title.textContent = "✨ 缺題補足模式";
+            title.style.color = "var(--success)";
+            desc.innerHTML = "<p>此操作會<b>保留現有題目</b>，僅針對目前稽核結果中顯示『缺題』的章節進行 AI 自動補全。</p>";
+        }
+
+        updateCommandDisplay();
+        modal.style.display = 'flex';
+        modal.classList.remove('hidden');
+    }
+
+    function updateCommandDisplay() {
+        const grade = document.getElementById('update-grade').value;
+        const cmd = document.getElementById('command-box');
+        
+        let command = "python refresh_bank.py";
+        if (currentMode === 'patch') {
+            command += " --patch";
+        }
+        
+        if (grade !== 'all') {
+            command += ` --grade ${grade}`;
+        }
+        
+        cmd.textContent = command;
+    }
+
+    function hideRefreshModal() {
+        const modal = document.getElementById('refresh-modal');
+        modal.style.display = 'none';
+        modal.classList.add('hidden');
+    }
+
+    // --- ODS Audit Logic ---
+    const dropZone = document.getElementById('drop-zone');
+    const odsInput = document.getElementById('ods-upload');
+
+    odsInput.addEventListener('change', (e) => handleOdsAudit(e.target.files[0]));
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        handleOdsAudit(e.dataTransfer.files[0]);
+    });
+
+    async function handleOdsAudit(file) {
+        if (!file) return;
+        document.getElementById('drop-text').textContent = "⏳ 正在分析檔案...";
+        
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+                // 提取所有可能的知識點代碼 (Regex 匹配)
+                const nodeRegex = /[A-Z]-\d+-\d+(?:-\w+)?/g;
+                const foundNodes = new Set();
+                
+                jsonData.forEach(row => {
+                    row.forEach(cell => {
+                        const matches = String(cell).match(nodeRegex);
+                        if (matches) matches.forEach(m => foundNodes.add(m.toUpperCase()));
+                    });
+                });
+
+                showAuditReport(file.name, Array.from(foundNodes));
+                document.getElementById('drop-text').textContent = "📄 點擊或拖曳 ODS 檔案";
+            } catch (err) {
+                console.error(err);
+                alert("檔案解析失敗，請確認是否為正確的 ODS 格式。");
+                document.getElementById('drop-text').textContent = "📄 點擊或拖曳 ODS 檔案";
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function showAuditReport(fileName, nodesInOds) {
+        const modal = document.getElementById('report-modal');
+        const listContainer = document.getElementById('ods-missing-list');
+        const patchInstruction = document.getElementById('ods-patch-instruction');
+        
+        document.getElementById('report-file-name').textContent = fileName;
+        listContainer.innerHTML = '';
+
+        // 準備稽核數據 (複用 initAudit 的過濾邏輯)
+        const masterBank = JSON.parse(JSON.stringify(QUESTION_BANK));
+        if (typeof EXTRA_QUESTION_BANK !== 'undefined') {
+            for (const node in EXTRA_QUESTION_BANK) {
+                const cleanNode = node.trim().toUpperCase();
+                if (!masterBank[cleanNode]) masterBank[cleanNode] = { beginner: [], intermediate: [], advanced: [], literacy: [] };
+                for (const level in EXTRA_QUESTION_BANK[node]) {
+                    masterBank[cleanNode][level] = (masterBank[cleanNode][level] || []).concat(EXTRA_QUESTION_BANK[node][level]);
+                }
+            }
+        }
+
+        const filterPlaceholders = (qs) => (qs || []).filter(q => {
+            const isFake1 = (q.options || []).some(opt => opt.includes('錯誤值') || opt.includes('正確結果'));
+            const isFake2 = q.exp && q.exp.includes('基礎題型');
+            const isFake3 = (q.options || []).some(opt => opt.includes('此為正確的觀念描述') || opt.includes('該觀念的錯誤誤解') || opt.includes('完全不相干的描述'));
+            return !isFake1 && !isFake2 && !isFake3;
+        });
+
+        let missingList = [];
+        let coveredCount = 0;
+
+        nodesInOds.forEach(code => {
+            const bank = masterBank[code] || { beginner: [], intermediate: [], advanced: [], literacy: [] };
+            const total = filterPlaceholders(bank.beginner).length + 
+                        filterPlaceholders(bank.intermediate).length + 
+                        filterPlaceholders(bank.advanced).length +
+                        filterPlaceholders(bank.literacy).length;
+            
+            if (total < 2) { // 這裡使用跟 sync_all.py 一致的門檻
+                missingList.push({ code, status: total === 0 ? '完全缺失' : '題量不足' });
+            } else {
+                coveredCount++;
+            }
+        });
+
+        document.getElementById('ods-total-nodes').textContent = nodesInOds.length;
+        document.getElementById('ods-covered-nodes').textContent = coveredCount;
+        document.getElementById('ods-missing-nodes').textContent = missingList.length;
+
+        if (missingList.length === 0) {
+            listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--success); font-weight: bold;">🎉 太棒了！此檔案要求的所有知識點均已覆蓋。</div>';
+            patchInstruction.classList.add('hidden');
+        } else {
+            missingList.forEach(m => {
+                const item = document.createElement('div');
+                item.className = 'report-item';
+                const desc = NODES_DESCRIPTIONS[m.code] || "未定義描述的知識點";
+                item.innerHTML = `
+                    <div style="flex: 1;">
+                        <span class="node-code">${m.code}</span>
+                        <div style="font-size: 12px; color: #8E8E93;">${desc}</div>
+                    </div>
+                    <span class="status-pill ${m.status === '完全缺失' ? 'status-danger' : 'status-warn'}">${m.status}</span>
+                `;
+                listContainer.appendChild(item);
+            });
+            
+            patchInstruction.classList.remove('hidden');
+            document.getElementById('ods-patch-cmd').textContent = `python sync_all.py`; // 指導使用者執行新的同步腳本
+        }
+
+        modal.classList.remove('hidden');
+        modal.style.display = 'flex';
+    }
+
+    function closeReport() {
+        const modal = document.getElementById('report-modal');
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+        
+        // 觸發一次搜尋，方便使用者查看缺失點
+        const missingCount = parseInt(document.getElementById('ods-missing-nodes').textContent);
+        if (missingCount > 0) {
+            // 自動過濾顯示缺失點
+            // setFilter('missing'); 
+        }
+    }
+
+    window.onload = initAudit;
+</script>
+
+</body>
+</html>

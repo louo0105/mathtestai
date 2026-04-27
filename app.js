@@ -40,7 +40,7 @@ function mergeExtraQuestions() {
     // 1. 強制清除舊有的假佔位符題目 (避免殘留)
     // 修正：僅對比特定的預設關鍵字，避免誤刪包含「錯誤」二字的真實題目
     Object.keys(QUESTION_BANK).forEach(node => {
-        ['beginner', 'intermediate', 'advanced'].forEach(level => {
+        ['beginner', 'intermediate', 'advanced', 'literacy'].forEach(level => {
             if (QUESTION_BANK[node] && QUESTION_BANK[node][level]) {
                 const before = QUESTION_BANK[node][level].length;
                 QUESTION_BANK[node][level] = QUESTION_BANK[node][level].filter(q => {
@@ -58,7 +58,7 @@ function mergeExtraQuestions() {
     if (typeof EXTRA_QUESTION_BANK !== 'undefined') {
         for (const node in EXTRA_QUESTION_BANK) {
             const cleanNode = node.trim().toUpperCase();
-            if (!QUESTION_BANK[cleanNode]) QUESTION_BANK[cleanNode] = { beginner: [], intermediate: [], advanced: [] };
+            if (!QUESTION_BANK[cleanNode]) QUESTION_BANK[cleanNode] = { beginner: [], intermediate: [], advanced: [], literacy: [] };
             
             mergedNodes++;
             for (const level in EXTRA_QUESTION_BANK[node]) {
@@ -476,7 +476,7 @@ window.startPractice = async function (nodeCode) {
         
         // 【動態防呆】如果連父節點都沒有，才產出防呆題
         if (finalQuestions.length === 0) {
-            const lvlName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[currentLevel];
+            const lvlName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級', 'literacy': '素養題' }[currentLevel];
             for(let k=1; k<=5; k++) {
                 finalQuestions.push({
                     q: `【題庫補充中】針對「${nodeLabel}」目前尚無匹配題目。此為系統產出的防呆題（${lvlName} 第 ${k} 題）。\n\n請問 1+1 等於多少？`,
@@ -505,7 +505,7 @@ window.startPractice = async function (nodeCode) {
     hideAllPages();
     practicePage.classList.add('active');
 
-    const levelName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[currentLevel];
+    const levelName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級', 'literacy': '素養題' }[currentLevel];
     document.getElementById('current-node-title').textContent = `${nodeCode} (${levelName})`;
     updateQuestionUI();
 };
@@ -837,23 +837,24 @@ async function renderProgressOverview() {
         }, {});
 
         let completedCount = 0;
-        let bCount = 0, iCount = 0, aCount = 0;
+        let bCount = 0, iCount = 0, aCount = 0, lCount = 0;
 
         studentWeakNodes.forEach(node => {
             if (progress[`${node}_beginner`]) { completedCount++; bCount++; }
             if (progress[`${node}_intermediate`]) { completedCount++; iCount++; }
             if (progress[`${node}_advanced`]) { completedCount++; aCount++; }
+            if (progress[`${node}_literacy`]) { completedCount++; lCount++; }
         });
 
-        const totalTasks = totalPossible * 3; // 三個難度
+        const totalTasks = totalPossible * 4; 
         const percent = totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${student.id}</td>
             <td>${student.name}</td>
-            <td>${totalPossible} 個弱點</td>
-            <td>${bCount} / ${iCount} / ${aCount}</td>
+            <td>${totalPossible} 弱點</td>
+            <td>${bCount} / ${iCount} / ${aCount} / ${lCount}</td>
             <td>${percent}%</td>
             <td>
                 <span class="progress-tag ${percent >= 80 ? 'high' : 'low'}">
