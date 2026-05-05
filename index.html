@@ -171,6 +171,23 @@
 
                 <section class="teacher-section card glass">
                     <div class="section-header">
+                        <h2>題庫來源設定</h2>
+                    </div>
+                    <p class="section-desc">請選擇學生練習時要啟用的題庫來源。預設為「雙題庫融合」以提供最豐富的題型。</p>
+                    <div class="ai-controls">
+                        <div class="toggle-group" style="display: flex; align-items: center; gap: 15px;">
+                            <span>啟用題庫：</span>
+                            <select id="bank-selector" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; outline: none; flex: 1;">
+                                <option value="both">雙題庫融合 (題庫 1 + 題庫 2) - 推薦</option>
+                                <option value="bank1">僅使用題庫 1</option>
+                                <option value="bank2">僅使用題庫 2</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="teacher-section card glass">
+                    <div class="section-header">
                         <h2>學生練習進度總覽</h2>
                     </div>
                     <span class="section-desc">統計每位學生在目前所有弱點節點的完成狀況。</span>
@@ -239,6 +256,7 @@
     <script src="db.js?v=18" defer></script>
     <script src="data.js?v=18" defer></script>
     <script src="extra_data.js?v=18" defer></script>
+    <script src="extra_data_2.js?v=18" defer></script>
     <script src="app.js?v=18" defer></script>
 </body>
 </html>

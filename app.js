@@ -54,8 +54,11 @@ function mergeExtraQuestions() {
         });
     });
 
-    // 2. 將新的題庫合併進來
-    if (typeof EXTRA_QUESTION_BANK !== 'undefined') {
+    const bankSelection = localStorage.getItem('bank_selector') || 'both';
+    console.log(`啟用題庫模式：${bankSelection}`);
+
+    // 2. 將新的題庫1合併進來
+    if (typeof EXTRA_QUESTION_BANK !== 'undefined' && (bankSelection === 'both' || bankSelection === 'bank1')) {
         for (const node in EXTRA_QUESTION_BANK) {
             const cleanNode = node.trim().toUpperCase();
             if (!QUESTION_BANK[cleanNode]) QUESTION_BANK[cleanNode] = { beginner: [], intermediate: [], advanced: [], literacy: [] };
@@ -69,7 +72,22 @@ function mergeExtraQuestions() {
             }
         }
     }
-    console.log(`✅ 題庫整理完畢：清理了 ${cleanedCount} 題預設題，成功合併 ${mergedNodes} 個結點，共 ${totalQuestions} 題額外題目。`);
+
+    // 3. 將新的題庫2合併進來
+    if (typeof EXTRA_QUESTION_BANK_2 !== 'undefined' && (bankSelection === 'both' || bankSelection === 'bank2')) {
+        for (const node in EXTRA_QUESTION_BANK_2) {
+            const cleanNode = node.trim().toUpperCase();
+            if (!QUESTION_BANK[cleanNode]) QUESTION_BANK[cleanNode] = { beginner: [], intermediate: [], advanced: [], literacy: [] };
+            
+            for (const level in EXTRA_QUESTION_BANK_2[node]) {
+                if (!QUESTION_BANK[cleanNode][level]) QUESTION_BANK[cleanNode][level] = [];
+                const extraQs = EXTRA_QUESTION_BANK_2[node][level];
+                QUESTION_BANK[cleanNode][level] = QUESTION_BANK[cleanNode][level].concat(extraQs);
+                totalQuestions += extraQs.length;
+            }
+        }
+    }
+    console.log(`✅ 雙題庫整理完畢：共匯入 ${totalQuestions} 題高品質題目，目前模式：${bankSelection}。`);
 }
 
 // 初始化
@@ -130,6 +148,16 @@ function setupEventListeners() {
     
     // 新增匯出按鈕監聽
     document.getElementById('export-records-btn').addEventListener('click', exportRecordsToCSV);
+
+    // 題庫切換監聽
+    const bankSelector = document.getElementById('bank-selector');
+    if (bankSelector) {
+        bankSelector.addEventListener('change', (e) => {
+            localStorage.setItem('bank_selector', e.target.value);
+            showToast('題庫切換成功！系統將重新載入...', 'success');
+            setTimeout(() => location.reload(), 1500);
+        });
+    }
 
     // ODS 上傳處理
     const odsInput = document.getElementById('ods-input');
@@ -331,6 +359,12 @@ function showTeacherPage() {
     if (aiToggle) {
         aiToggle.checked = isAiMode;
         updateAIStatusUI();
+    }
+
+    // 更新題庫下拉選單狀態
+    const bankSelector = document.getElementById('bank-selector');
+    if (bankSelector) {
+        bankSelector.value = localStorage.getItem('bank_selector') || 'both';
     }
 }
 
