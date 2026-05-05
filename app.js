@@ -936,7 +936,7 @@ async function renderActivityLog() {
 
     filtered.forEach(r => {
         const tr = document.createElement('tr');
-        const levelName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[r.level];
+        const levelName = { 'beginner': '初階', 'intermediate': '中階', 'advanced': '進階', 'literacy': '素養題' }[r.level] || r.level;
         const nodeTitle = NODES_DESCRIPTIONS[r.node_code] || r.node_code;
         tr.innerHTML = `
             <td>${r.student_id}</td>
@@ -970,7 +970,7 @@ async function exportRecordsToCSV() {
     let csvContent = "學號,姓名,練習項目代碼,練習項目名稱,難度,正確率,耗時,最後練習時間\n";
 
     records.forEach(r => {
-        const levelName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[r.level];
+        const levelName = { 'beginner': '初階', 'intermediate': '中階', 'advanced': '進階', 'literacy': '素養題' }[r.level] || r.level;
         const nodeTitle = (typeof NODES_DESCRIPTIONS !== 'undefined' && NODES_DESCRIPTIONS[r.node_code]) ? NODES_DESCRIPTIONS[r.node_code] : r.node_code;
         // 處理 CSV 欄位中可能包含逗號的情況
         const safeTitle = `"${nodeTitle.replace(/"/g, '""')}"`;
